@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { @apply bg-ink-950 text-zinc-200 font-sans antialiased; }
+
+/* Hoạ tiết "lớp in" FDM: các vạch ngang mô phỏng layer line */
+@layer utilities {
+  .layers {
+    background-image: repeating-linear-gradient(0deg, rgba(255,255,255,.06) 0 1px, transparent 1px 7px);
+  }
+  .layers-dark {
+    background-image: repeating-linear-gradient(0deg, rgba(0,0,0,.14) 0 1px, transparent 1px 5px);
+  }
+}

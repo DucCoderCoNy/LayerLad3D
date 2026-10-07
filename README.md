@@ -20,3 +20,5 @@ Không có file `.env` -> dữ liệu lưu trong trình duyệt. Admin mặc đ�
 
 ## Đưa lên mạng
 Vercel/Netlify: đẩy code lên GitHub, import repo, thêm 2 biến môi trường `VITE_SUPABASE_URL` và `VITE_SUPABASE_ANON_KEY`, Deploy.
+# layerlab-3d
+# layerlab-3d

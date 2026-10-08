@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { NAV, SITE } from '../data/site.js'
+import { POLICIES } from '../data/pages.js'
 import { Logo } from './Header.jsx'
 import { useStore } from '../lib/store.js'
 
@@ -7,7 +8,7 @@ export default function Footer() {
   const [st] = useStore('settings')
   return (
     <footer className="mt-24 border-t border-white/10 bg-ink-900">
-      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-12 md:grid-cols-3">
+      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-12 md:grid-cols-4">
         <div>
           <Logo />
           <p className="mt-3 max-w-xs text-sm text-zinc-400">
@@ -21,10 +22,17 @@ export default function Footer() {
           </ul>
         </div>
         <div>
+          <h4 className="mb-3 font-semibold text-white">Hỗ trợ</h4>
+          <ul className="space-y-2 text-sm text-zinc-400">
+            <li><Link to="/tra-cuu" className="hover:text-accent">Tra cứu đơn hàng</Link></li><li><Link to="/faq" className="hover:text-accent">Câu hỏi thường gặp</Link></li>
+            {POLICIES.map((p) => <li key={p.slug}><Link to={`/chinh-sach/${p.slug}`} className="hover:text-accent">{p.title}</Link></li>)}
+          </ul>
+        </div>
+        <div>
           <h4 className="mb-3 font-semibold text-white">Liên hệ</h4>
           <ul className="space-y-2 text-sm text-zinc-400">
             <li>{st.phone}</li><li>{st.email}</li>
-            <li><a className="hover:text-accent" href={SITE.zalo} target="_blank" rel="noreferrer">Nhắn Zalo</a></li>
+            <li><a className="hover:text-accent" href={st.zalo || SITE.zalo} target="_blank" rel="noreferrer">Nhắn Zalo</a></li>
           </ul>
         </div>
       </div>

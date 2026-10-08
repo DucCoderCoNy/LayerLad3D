@@ -1,41 +1,71 @@
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatVND } from '../../data/products.js'
 import { useStore } from '../../lib/store.js'
+import { todoItems } from '../../lib/orderTools.js'
+import { useWset } from './wui.jsx'
+import { dayKey, periodStats, presetRange } from '../../lib/finance.js'
+import DateRange from '../../components/DateRange.jsx'
 import WorkshopSummary from './WorkshopSummary.jsx'
-import { Badge, ORDER_STATUS, DataTable, td } from '../../components/ui.jsx'
+import { Badge, ORDER_STATUS, DataTable, PAY_STATUS, payStatusOf, td } from '../../components/ui.jsx'
 
 export default function Dashboard() {
-  const [orders] = useStore('orders'), [products] = useStore('products'), [users] = useStore('users'), [reqs] = useStore('requests')
-  const valid = orders.filter((o) => o.status !== 'cancelled')
-  const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 6 + i); return d })
-  const rev = days.map((d) => valid.filter((o) => new Date(o.createdAt).setHours(0, 0, 0, 0) === +d).reduce((s, o) => s + o.total, 0))
-  const max = Math.max(...rev, 1)
+  const [orders] = useStore('orders'), [ws] = useStore('ws'), [printers] = useStore('printers'), wset = useWset(), [wo] = useStore('wo'), [wc] = useStore('wc'), [products] = useStore('products'), [reqs] = useStore('requests')
+  const [range, setRange] = useState(() => presetRange('month'))
+  const [from, to] = range
+  const S = useMemo(() => periodStats({ orders, wo, wc }, from, to), [orders, wo, wc, from, to])
+
+  // Biểu đồ doanh thu: theo ngày nếu khoảng ≤ 31 ngày, ngược lại gộp theo tháng
+  const bars = useMemo(() => {
+    const valid = orders.filter((o) => o.status !== 'cancelled' && !o.wo), shop = wo.filter((o) => o.status !== 'Huỷ')
+    const rows = [...valid.map((o) => [dayKey(o.createdAt), o.total]), ...shop.map((o) => [o.date, o.price])].filter(([d]) => d && (!from || d >= from) && (!to || d <= to))
+    const a = from || rows.map((r) => r[0]).sort()[0] || dayKey(Date.now()), b = to || dayKey(Date.now())
+    const span = (new Date(b) - new Date(a)) / 864e5 + 1, byMonth = span > 31, m = new Map()
+    for (let t = new Date(a); t <= new Date(b); t = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)) { const k = dayKey(t); m.set(byMonth ? k.slice(0, 7) : k, 0) }
+    rows.forEach(([d, v]) => { const k = byMonth ? d.slice(0, 7) : d; if (m.has(k)) m.set(k, m.get(k) + v) })
+    return [...m].map(([k, v]) => ({ k, v, label: byMonth ? `${k.slice(5)}/${k.slice(2, 4)}` : `${+k.slice(8)}/${+k.slice(5, 7)}` }))
+  }, [orders, wo, from, to])
+  const max = Math.max(...bars.map((b) => b.v), 1)
   const cards = [
-    ['Doanh thu', formatVND(valid.reduce((s, o) => s + o.total, 0))], ['Đơn hàng', orders.length], ['Đơn mới', orders.filter((o) => o.status === 'new').length],
-    ['Yêu cầu chờ báo giá', reqs.filter((r) => r.status === 'pending').length], ['Sản phẩm', products.length], ['Người dùng', users.length],
+    ['Doanh thu', formatVND(S.revenue), 'text-white'], ['Chi phí', formatVND(S.expense), 'text-red-300'], ['Lợi nhuận', formatVND(S.profit), S.profit < 0 ? 'text-red-400' : 'text-emerald-400'],
+    ['Số đơn', S.orders, 'text-white'], ['Đơn đang xử lý', S.processing, 'text-accent'], ['Đã thu tiền', formatVND(S.collected), 'text-white'],
   ]
-  const low = products.filter((p) => p.stock <= 5)
+  const todo = useMemo(() => todoItems({ orders, products, ws, wo, printers, wset }), [orders, products, ws, wo, printers, wset])
+  const mine = [...orders].slice(0, 6)
   return (
     <div className="space-y-8">
       <h1 className="font-display text-3xl font-bold text-white">Tổng quan</h1>
-      <WorkshopSummary />
-      <h2 className="text-lg font-semibold text-white">Cửa hàng online</h2>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">{cards.map(([l, v]) => (
-        <div key={l} className="rounded-2xl border border-white/10 bg-ink-800 p-5"><p className="text-sm text-zinc-400">{l}</p><p className="mt-1 font-display text-2xl font-bold text-white">{v}</p></div>))}</div>
       <div className="rounded-2xl border border-white/10 bg-ink-800 p-5">
-        <p className="mb-4 text-sm text-zinc-400">Doanh thu 7 ngày gần nhất</p>
-        <div className="flex h-40 items-end gap-3">{rev.map((v, i) => (
-          <div key={i} className="flex flex-1 flex-col items-center gap-1" title={formatVND(v)}>
-            <div className="w-full rounded-t-md bg-accent" style={{ height: `${(v / max) * 100}%`, minHeight: 3 }} />
-            <span className="text-xs text-zinc-500">{days[i].getDate()}/{days[i].getMonth() + 1}</span></div>))}</div>
+        <h2 className="mb-3 font-semibold text-white">Việc cần làm hôm nay</h2>
+        {todo.length === 0 ? <p className="text-sm text-emerald-400">✓ Không có việc tồn đọng. Mọi thứ đang ổn.</p> : (
+          <ul className="space-y-2 text-sm">{todo.map((t) => (
+            <li key={t.text}><Link to={t.to} className="flex items-start gap-3 rounded-lg bg-ink-900 p-3 hover:bg-white/5">
+              <i className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${{ high: 'bg-red-400', mid: 'bg-amber-400', low: 'bg-sky-400' }[t.level]}`} /><span className="text-zinc-200">{t.text}</span><span className="ml-auto shrink-0 text-accent">Xử lý →</span></Link></li>))}</ul>)}
       </div>
+      <div className="space-y-4 rounded-2xl border border-white/10 bg-ink-800 p-5">
+        <DateRange value={range} onChange={setRange} />
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">{cards.map(([l, v, c]) => (
+          <div key={l} className="rounded-xl bg-ink-900 p-4"><p className="text-sm text-zinc-400">{l}</p><p className={`mt-1 font-display text-2xl font-bold ${c}`}>{v}</p></div>))}</div>
+        <p className="text-xs leading-relaxed text-zinc-500">
+          Chi phí gồm: nhựa {formatVND(S.filament)} · điện {formatVND(S.power)} · khác {formatVND(S.other)} (lấy từ sổ Thu chi). Lợi nhuận = doanh thu − chi phí.
+          {S.estCost > 0 && <> Theo giá vốn ước tính của đơn xưởng, lãi gộp là <b className="text-zinc-300">{formatVND(S.grossProfit)}</b>.</>} Doanh thu không tính đơn đã hủy.
+        </p>
+      </div>
+      <div className="rounded-2xl border border-white/10 bg-ink-800 p-5">
+        <p className="mb-4 text-sm text-zinc-400">Doanh thu theo {bars.length && bars[0].k.length === 7 ? 'tháng' : 'ngày'}</p>
+        <div className="flex h-40 items-end gap-1 sm:gap-2">{bars.map((b) => (
+          <div key={b.k} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${b.label}: ${formatVND(b.v)}`}>
+            <div className="w-full rounded-t bg-accent" style={{ height: `${(b.v / max) * 100}%`, minHeight: 2 }} />
+            {bars.length <= 16 && <span className="text-[10px] text-zinc-500">{b.label}</span>}</div>))}</div>
+      </div>
+      <WorkshopSummary />
       <div>
         <div className="mb-3 flex justify-between"><h2 className="text-lg font-semibold text-white">Đơn gần đây</h2><Link to="/admin/orders" className="text-sm text-accent">Xem tất cả</Link></div>
-        <DataTable heads={['Mã', 'Khách', 'Tổng', 'Trạng thái']} empty="Chưa có đơn hàng">
-          {orders.slice(0, 5).map((o) => <tr key={o.id}><td className={td}>{o.id}</td><td className={td}>{o.customer.name}</td><td className={td}>{formatVND(o.total)}</td><td className={td}><Badge map={ORDER_STATUS} v={o.status} /></td></tr>)}
+        <DataTable heads={['Mã', 'Khách', 'Tổng', 'Thanh toán', 'Trạng thái']} empty="Chưa có đơn hàng">
+          {mine.map((o) => <tr key={o.id}><td className={td}>{o.id}</td><td className={td}>{o.customer.name}</td><td className={td}>{formatVND(o.total)}</td><td className={td}><Badge map={PAY_STATUS} v={payStatusOf(o)} /></td><td className={td}><Badge map={ORDER_STATUS} v={o.status} /></td></tr>)}
         </DataTable>
       </div>
-      {low.length > 0 && <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-sm text-amber-200">Sắp hết hàng: {low.map((p) => `${p.name} (${p.stock})`).join(', ')}</div>}
+      {reqs.filter((r) => r.status === 'pending').length > 0 && <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 p-4 text-sm text-sky-200">Có {reqs.filter((r) => r.status === 'pending').length} yêu cầu báo giá cũ đang chờ – <Link to="/admin/requests" className="underline">xem</Link>.</div>}
     </div>
   )
 }

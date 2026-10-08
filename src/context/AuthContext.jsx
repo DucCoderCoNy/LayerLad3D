@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { getStore, reloadAll, supa, uid, useStore } from '../lib/store.js'
+import { getStore, setRole, supa, uid, useStore } from '../lib/store.js'
 
 const AuthContext = createContext(null)
 export const useAuth = () => useContext(AuthContext)
@@ -29,15 +29,16 @@ function LocalAuth({ children }) {
 function SupaAuth({ children }) {
   const [user, setUser] = useState(null), [ready, setReady] = useState(false)
   const loadProfile = async (session, retry = true) => {
-    if (!session) { setUser(null); setReady(true); return }
+    if (!session) { setUser(null); setRole(null); setReady(true); return }
     const { data } = await supa.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
     if (!data && retry) { await new Promise((r) => setTimeout(r, 700)); return loadProfile(session, false) } // chờ trigger tạo hồ sơ
-    if (data?.banned) { await supa.auth.signOut(); setUser(null); setReady(true); return }
-    setUser(data || { id: session.user.id, name: session.user.email, email: session.user.email, role: 'customer' }); setReady(true)
+    if (data?.banned) { await supa.auth.signOut(); setUser(null); setRole(null); setReady(true); return }
+    const u = data || { id: session.user.id, name: session.user.email, email: session.user.email, role: 'customer' }
+    setUser(u); setRole(u.role || 'customer'); setReady(true)
   }
   useEffect(() => {
     supa.auth.getSession().then(({ data }) => loadProfile(data.session))
-    const { data: sub } = supa.auth.onAuthStateChange((_e, session) => setTimeout(() => { loadProfile(session); reloadAll() }, 0))
+    const { data: sub } = supa.auth.onAuthStateChange((_e, session) => setTimeout(() => loadProfile(session), 0))
     return () => sub.subscription.unsubscribe()
   }, [])
   const login = async (email, pw) => {

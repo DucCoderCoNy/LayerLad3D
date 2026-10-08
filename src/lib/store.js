@@ -2,15 +2,24 @@
 // API không đổi: const [items, setItems] = useStore('products')
 import { useSyncExternalStore } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { PRODUCTS } from '../data/products.js'
+import { PRODUCTS, CATEGORIES } from '../data/products.js'
+import { POSTS } from '../data/posts.js'
 import { DEFSET } from './workshop.js'
+import { slugify } from './slug.js'
+import { DEFAULT_COLORS } from '../data/colors.js'
 
 const URL = import.meta.env.VITE_SUPABASE_URL, KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 export const supa = URL && KEY ? createClient(URL, KEY) : null
 
 const PFX = 'll3d:'
 const SEED = {
-  products: PRODUCTS.map((p) => ({ ...p, stock: 50, active: true, image: '' })),
+  products: PRODUCTS.map((p) => ({ ...p, slug: slugify(p.name), stock: 50, active: true, image: '', images: [], colorIds: [] })),
+  categories: CATEGORIES.filter((c) => c.id !== 'all'),
+  posts: POSTS,
+  showcase: [], // thư viện ảnh + đánh giá khách (quản lý trong Admin)
+  colors: DEFAULT_COLORS,   // màu nhựa dùng chung (Admin: Quản lý màu)
+  printers: [{ id: 'pr-1', name: 'Anycubic Kobra X', model: 'Kobra X', status: 'idle', note: '', active: true }], // máy in (Admin: Máy in)
+  customers: [],            // ghi chú nội bộ theo khách (id = số điện thoại chuẩn hóa); lịch sử mua tính từ đơn hàng
   orders: [],
   requests: [],
   wo: [], ws: [], wc: [], wset: { ...DEFSET }, // xưởng: đơn, kho, thu chi, thông số giá vốn
@@ -19,11 +28,20 @@ const SEED = {
     storeName: 'LayerLab 3D', phone: '0900 000 000', email: 'hello@layerlab3d.vn',
     bankId: '970422', bankAccount: '0123456789', bankHolder: 'NGUYEN VAN A', // 970422 = MB Bank
     pricePerGram: 1500, pricePerHour: 8000, designFee: 50000, shipFee: 25000, freeShipOver: 300000,
+    zalo: 'https://zalo.me/0900000000', messenger: '', address: '', hours: '8:00 – 21:00 (T2 – CN)',
+    keychainBase: 25000, keychainPerChar: 3000, ttBase: 10000, ttPerCell: 3400, // công cụ tùy biến (server tự tính lại giá)
+    shipZones: [{ id: 'z1', name: 'Nội thành Hà Nội / TP.HCM', fee: 20000 }, { id: 'z2', name: 'Các tỉnh/thành khác', fee: 30000 }, { id: 'z3', name: 'Vùng xa, hải đảo', fee: 45000 }],
   },
 }
 const OBJ = ['settings', 'wset']                 // bộ sưu tập dạng 1 object (lưu id 'main')
 const DESC = ['orders', 'requests', 'wo', 'wc']  // mới nhất lên đầu
 export const KEYS = Object.keys(SEED).filter((k) => !(supa && k === 'users')) // users chỉ có ở chế độ local
+// Chế độ server: khách chỉ tải dữ liệu công khai; đơn/yêu cầu của chính mình khi đã đăng nhập; phần còn lại chỉ admin (tránh tải thừa + RLS vẫn chặn ở server)
+const PUBLIC_KEYS = ['products', 'categories', 'posts', 'showcase', 'colors', 'settings']
+const USER_KEYS = ['orders', 'requests']
+let role = null // null = chưa đăng nhập, 'customer', 'admin'
+const keysFor = () => (!supa ? KEYS : role === 'admin' ? KEYS : role ? [...PUBLIC_KEYS, ...USER_KEYS] : PUBLIC_KEYS)
+export function setRole(r) { const changed = role !== (r || null); role = r || null; if (changed && supa) { Object.keys(cache).forEach((k) => { if (!keysFor().includes(k)) delete cache[k] }); reloadAll() } }
 const listeners = new Set(), cache = {}
 let loaded = !supa
 const emit = () => listeners.forEach((f) => f())
@@ -31,7 +49,7 @@ const emit = () => listeners.forEach((f) => f())
 function read(k) {
   if (!(k in cache)) {
     if (supa) cache[k] = OBJ.includes(k) ? SEED[k] : []
-    else { try { const v = localStorage.getItem(PFX + k); cache[k] = v ? JSON.parse(v) : SEED[k] } catch { cache[k] = SEED[k] } }
+    else { try { const v = localStorage.getItem(PFX + k); cache[k] = v ? (OBJ.includes(k) ? { ...SEED[k], ...JSON.parse(v) } : JSON.parse(v)) : SEED[k] } catch { cache[k] = SEED[k] } }
   }
   return cache[k]
 }
@@ -53,12 +71,12 @@ async function persist(k, old, nv) {
   }
 }
 async function loadCollection(k) {
-  const { data, error } = await supa.from('records').select('id,data').eq('collection', k).order('created_at', { ascending: !DESC.includes(k) })
+  const { data, error } = await supa.from('records').select('id,data').eq('collection', k).order('created_at', { ascending: !DESC.includes(k) }).limit(5000)
   if (error) return console.error(error)
   if (OBJ.includes(k)) { if (data[0]) cache[k] = { ...SEED[k], ...data[0].data } } else cache[k] = data.map((r) => r.data)
   emit()
 }
-export async function reloadAll() { if (!supa) return; await Promise.all(KEYS.map(loadCollection)); loaded = true; emit() }
+export async function reloadAll() { if (!supa) return; await Promise.all(keysFor().map(loadCollection)); loaded = true; emit() }
 
 /** Ghi giá trị mới cho 1 bộ sưu tập (cập nhật giao diện ngay, rồi đồng bộ lên server) */
 export function write(k, v) {
@@ -94,6 +112,9 @@ export async function seedRemote() {
   if (read('products').length && !confirm('Server đã có sản phẩm. Vẫn nạp thêm sản phẩm mẫu?')) return
   const have = new Set(read('products').map((p) => p.id))
   write('products', [...read('products'), ...SEED.products.filter((p) => !have.has(p.id))])
+  const hc = new Set(read('categories').map((c) => c.id)), hp = new Set(read('posts').map((c) => c.id))
+  write('categories', [...read('categories'), ...SEED.categories.filter((c) => !hc.has(c.id))])
+  write('posts', [...read('posts'), ...SEED.posts.filter((c) => !hp.has(c.id))])
   write('settings', { ...SEED.settings, ...read('settings') }); write('wset', { ...SEED.wset, ...read('wset') })
 }
 export function resetAll() { Object.keys(SEED).forEach((k) => localStorage.removeItem(PFX + k)); localStorage.removeItem('ll3d:session'); localStorage.removeItem('ll3d:cart'); location.href = '/' }
@@ -103,7 +124,7 @@ if (supa) {
   reloadAll()
   supa.channel('records').on('postgres_changes', { event: '*', schema: 'public', table: 'records' }, (p) => {
     const row = p.eventType === 'DELETE' ? p.old : p.new, k = row?.collection
-    if (!k || !KEYS.includes(k)) return
+    if (!k || !keysFor().includes(k)) return
     if (OBJ.includes(k)) { if (p.eventType !== 'DELETE') cache[k] = { ...SEED[k], ...p.new.data } }
     else {
       const arr = [...read(k)], i = arr.findIndex((x) => x.id === row.id)

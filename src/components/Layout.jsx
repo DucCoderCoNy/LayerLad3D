@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import Header from './Header.jsx'
 import Footer from './Footer.jsx'
+import FloatingContact from './FloatingContact.jsx'
 import CartDrawer from './CartDrawer.jsx'
 
 export default function Layout() {
@@ -9,7 +10,7 @@ export default function Layout() {
   useEffect(() => window.scrollTo(0, 0), [pathname])
   return (
     <div className="flex min-h-screen flex-col">
-      <Header /><main className="flex-1"><Outlet /></main><Footer /><CartDrawer />
+      <Header /><main className="flex-1"><Outlet /></main><Footer /><CartDrawer /><FloatingContact />
     </div>
   )
 }

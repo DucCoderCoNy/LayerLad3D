@@ -1,6 +1,7 @@
 import { formatVND } from '../../data/products.js'
 import { useStore } from '../../lib/store.js'
-import { fmtDT, isDone, plan, waitList } from '../../lib/workshop.js'
+import { useState } from 'react'
+import { fmtDT, isDone, plan, printerOf, waitList } from '../../lib/workshop.js'
 import { DataTable, btn, btn2, td } from '../../components/ui.jsx'
 import { Card, Kpi, Tag, useWset } from './wui.jsx'
 
@@ -28,8 +29,11 @@ function DayBars({ p }) {
 
 /** Lịch in cho 1 máy (Kobra X): thứ tự, giờ dự kiến, cảnh báo trễ hạn */
 export default function WorkshopQueue() {
-  const [orders, setWo] = useStore('wo'), [, setStock] = useStore('ws')
+  const [allOrders, setWo] = useStore('wo'), [, setStock] = useStore('ws'), [printers] = useStore('printers')
   const S = useWset()
+  const act = printers.filter((p) => p.active), [pid, setPid] = useState('')
+  const cur = act.find((p) => p.id === pid) || act[0]
+  const orders = cur ? allOrders.filter((o) => printerOf(o, printers) === cur.id) : allOrders // mỗi máy có hàng đợi riêng
   const p = plan(orders, S), run = p.filter((x) => x.run), wait = p.filter((x) => !x.run)
   const free = p.length ? Math.max(...p.map((x) => x.e)) + S.buf * 6e4 : Date.now()
   const quoted = orders.filter((o) => o.status === 'Báo giá').length
@@ -45,12 +49,13 @@ export default function WorkshopQueue() {
   }
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-3"><h1 className="mr-auto font-display text-3xl font-bold text-white">Lịch in</h1>
+      <div className="flex flex-wrap items-center gap-3"><h1 className="mr-auto font-display text-3xl font-bold text-white">Hàng đợi in{cur ? ` – ${cur.name}` : ''}</h1>
+        {act.length > 1 && <select value={cur?.id} onChange={(e) => setPid(e.target.value)} aria-label="Chọn máy in" className="rounded-lg border border-white/10 bg-ink-900 px-3 py-2 text-sm text-white">{act.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}
         <button onClick={autoSort} className={btn2}>Tự sắp xếp: gấp trước, gần hạn trước</button>
         <span className="text-sm text-zinc-400">{p.length} đơn · {p.reduce((a, x) => a + x.o.h, 0).toFixed(1)}h máy</span></div>
       <div className="grid gap-3 sm:grid-cols-3">
         <Kpi big l="Máy rảnh sớm nhất (để hẹn khách đơn mới)" v={fmtDT(free)} />
-        <Kpi l="Đang in" v={run.length ? run[0].o.name : 'Máy đang nghỉ'} />
+        <Kpi l="Đang in" v={run.length ? run[0].o.name : cur && cur.status !== 'idle' ? { maintenance: 'Máy đang bảo trì', offline: 'Máy tắt/không dùng' }[cur.status] : 'Máy đang nghỉ'} />
         <Kpi l="Đơn trễ hạn theo lịch" v={p.filter((x) => x.late).length} cls={p.some((x) => x.late) ? 'text-red-400' : ''} /></div>
       {run.length > 1 && <p className="rounded-xl bg-amber-500/10 p-3 text-sm text-amber-300">Có hơn 1 đơn "Đang in" nhưng chỉ có 1 máy. Hãy kiểm tra lại trạng thái.</p>}
       <Card title="Thứ tự in">

@@ -13,7 +13,16 @@ export function CartProvider({ children }) {
     setItems((cur) => {
       const key = p.id + color
       if (cur.some((i) => i.key === key)) return cur.map((i) => (i.key === key ? { ...i, qty: i.qty + qty } : i))
-      return [...cur, { key, id: p.id, name: p.name, price: p.price, image: p.image, hue: p.hue, color, qty }]
+      return [...cur, { key, id: p.id, name: p.name, price: p.price, image: p.images?.[0] || p.image, hue: p.hue, color, qty }]
+    })
+    setOpen(true)
+  }
+  /** Món tùy biến (móc khóa, thời khóa biểu): it = { id:'cfg-...', name, price, color, cfg, hue } – server tính lại giá từ cfg */
+  const addConfigured = (it, qty = 1) => {
+    setItems((cur) => {
+      const key = it.id + JSON.stringify(it.cfg)
+      if (cur.some((i) => i.key === key)) return cur.map((i) => (i.key === key ? { ...i, qty: i.qty + qty } : i))
+      return [...cur, { ...it, key, qty }]
     })
     setOpen(true)
   }
@@ -22,7 +31,7 @@ export function CartProvider({ children }) {
   const clear = () => setItems([])
 
   const value = useMemo(() => ({
-    items, addItem, setQty, removeItem, clear, open, setOpen,
+    items, addItem, addConfigured, setQty, removeItem, clear, open, setOpen,
     count: items.reduce((s, i) => s + i.qty, 0),
     total: items.reduce((s, i) => s + i.qty * i.price, 0),
   }), [items, open])

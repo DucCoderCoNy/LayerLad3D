@@ -8,13 +8,13 @@ import { Card } from './wui.jsx'
 
 /** Kho nhựa (gram, giá/kg) và vật tư. Nhập thêm/thêm mới có thể tự ghi khoản chi */
 export default function WorkshopStock() {
-  const [stock, setStock] = useStore('ws'), [, setCash] = useStore('wc')
+  const [stock, setStock] = useStore('ws'), [, setCash] = useStore('wc'), [colors] = useStore('colors')
   const [f, setF] = useState(null)
   const set = (k, v) => setF((c) => ({ ...c, [k]: v }))
   const spend = (s, amount, note) => amount > 0 && setCash((c) => [...c, { id: uid('c'), date: today(), type: 'out', cat: s.kind === 'filament' ? 'Mua nhựa' : 'Vật tư', amount, note }])
 
   const save = () => {
-    const v = { kind: f.kind, name: f.name.trim() || '(chưa đặt tên)', qty: num(f.qty), unit: f.kind === 'filament' ? 'g' : f.unit || 'cái', price: num(f.price), min: num(f.min) }
+    const v = { kind: f.kind, name: f.name.trim() || '(chưa đặt tên)', qty: num(f.qty), unit: f.kind === 'filament' ? 'g' : f.unit || 'cái', price: num(f.price), min: num(f.min), material: f.kind === 'filament' ? f.material || '' : '', color: f.kind === 'filament' ? f.color || '' : '' }
     if (f.id) setStock((c) => c.map((s) => (s.id === f.id ? { ...s, ...v } : s)))
     else { const s = { id: uid('s'), ...v }; setStock((c) => [...c, s]); if (f.rec && s.qty > 0) spend(s, Math.round(stockCost(s, s.qty)), s.name) }
     setF(null)
@@ -27,7 +27,7 @@ export default function WorkshopStock() {
   const table = (k) => (
     <DataTable heads={['Tên', 'Còn lại', 'Giá', 'Ngưỡng cảnh báo', '']} empty="Chưa có mục nào.">
       {stock.filter((s) => s.kind === k).map((s) => (
-        <tr key={s.id}><td className={`${td} text-white`}>{s.name}</td>
+        <tr key={s.id}><td className={`${td} text-white`}>{s.name}{(s.material || s.color) && <><br /><small className="text-zinc-500">{[s.material, s.color].filter(Boolean).join(' · ')}</small></>}</td>
           <td className={`${td} ${s.min > 0 && s.qty <= s.min ? 'font-semibold text-amber-400' : ''}`}>{s.qty} {s.unit}</td>
           <td className={td}>{$(s.price)}{k === 'filament' ? '/kg' : `/${s.unit}`}</td><td className={td}>{s.min || '—'}</td>
           <td className={`${td} whitespace-nowrap`}><button onClick={() => restock(s)} className="px-2 text-sm text-neon">Nhập thêm</button>
@@ -38,6 +38,7 @@ export default function WorkshopStock() {
     <div className="space-y-5">
       <div className="flex items-center"><h1 className="mr-auto font-display text-3xl font-bold text-white">Kho nhựa & vật tư</h1>
         <button onClick={() => setF({ kind: 'filament', name: '', qty: 1000, unit: 'g', price: 175000, min: 200, rec: true })} className={`${btn} flex items-center gap-1`}><Plus size={16} />Thêm vào kho</button></div>
+      {stock.some((s) => s.kind === 'filament' && s.min > 0 && s.qty <= s.min) && <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">⚠ Sắp hết: {stock.filter((s) => s.kind === 'filament' && s.min > 0 && s.qty <= s.min).map((s) => `${s.name} (${s.qty}g)`).join(', ')}</p>}
       <Card title="Nhựa in (tính bằng gram)">{table('filament')}</Card>
       <Card title="Vật tư (hộp, băng keo, sơn, giấy nhám, nozzle…)">{table('supply')}</Card>
       {f && (
@@ -45,7 +46,9 @@ export default function WorkshopStock() {
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Loại"><select value={f.kind} onChange={(e) => set('kind', e.target.value)} className={inp}><option value="filament">Nhựa in (gram)</option><option value="supply">Vật tư</option></select></Field>
             <Field label="Tên (vd: PLA đỏ eSUN)"><input value={f.name} onChange={(e) => set('name', e.target.value)} className={inp} /></Field>
-            <Field label="Số lượng còn"><input type="number" value={f.qty} onChange={(e) => set('qty', e.target.value)} className={inp} /></Field>
+            {f.kind === 'filament' && <Field label="Loại nhựa (để tự trừ kho theo đơn)"><select value={f.material || ''} onChange={(e) => set('material', e.target.value)} className={inp}><option value="">— không phân loại —</option><option>PLA</option><option>PETG</option><option>ABS</option></select></Field>}
+            {f.kind === 'filament' && <Field label="Màu"><select value={f.color || ''} onChange={(e) => set('color', e.target.value)} className={inp}><option value="">— không phân loại —</option>{colors.map((c) => <option key={c.id}>{c.name}</option>)}</select></Field>}
+            <Field label="Số lượng còn (g)"><input type="number" value={f.qty} onChange={(e) => set('qty', e.target.value)} className={inp} /></Field>
             {f.kind === 'supply' && <Field label="Đơn vị"><input value={f.unit} onChange={(e) => set('unit', e.target.value)} className={inp} /></Field>}
             <Field label="Giá (nhựa: đ/kg · vật tư: đ/đơn vị)"><input type="number" value={f.price} onChange={(e) => set('price', e.target.value)} className={inp} /></Field>
             <Field label="Ngưỡng cảnh báo"><input type="number" value={f.min} onChange={(e) => set('min', e.target.value)} className={inp} /></Field>

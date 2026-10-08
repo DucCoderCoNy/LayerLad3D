@@ -30,7 +30,7 @@ export default function Header() {
     <header className="sticky top-0 z-40 border-b border-white/10 bg-ink-950/85 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
         <Logo />
-        <nav className="hidden gap-1 md:flex">
+        <nav className="hidden gap-1 lg:flex">
           {NAV.map((n) => <NavLink key={n.to} to={n.to} end={n.to === '/'} className={link}>{n.label}</NavLink>)}
         </nav>
         <div className="flex items-center gap-2">
@@ -40,13 +40,13 @@ export default function Header() {
             <ShoppingBag size={22} />
             {count > 0 && <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-[11px] font-bold text-ink-950">{count}</span>}
           </button>
-          <button onClick={() => setMenu(!menu)} aria-label="Menu" className="rounded-lg p-2 hover:bg-white/10 md:hidden">
+          <button onClick={() => setMenu(!menu)} aria-label="Menu" className="rounded-lg p-2 hover:bg-white/10 lg:hidden">
             {menu ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
       </div>
       {menu && (
-        <nav className="flex flex-col border-t border-white/10 px-5 py-2 md:hidden">
+        <nav className="flex flex-col border-t border-white/10 px-5 py-2 lg:hidden">
           {NAV.map((n) => <NavLink key={n.to} to={n.to} end={n.to === '/'} className={link} onClick={() => setMenu(false)}>{n.label}</NavLink>)}
         </nav>
       )}

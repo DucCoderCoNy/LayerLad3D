@@ -24,7 +24,8 @@ export default function CartDrawer() {
                 <Thumb p={i} className="h-20 w-20 shrink-0 rounded-xl" />
                 <div className="flex-1">
                   <p className="font-medium text-white">{i.name}</p>
-                  <p className="text-xs text-zinc-500">Màu: {i.color}</p>
+                  <p className="text-xs text-zinc-500">Màu: {i.color}{i.cfg?.material && ` · ${i.cfg.material} · ${i.cfg.layer}mm · infill ${i.cfg.infill}%`}</p>
+                  {i.cfg?.estimate && <p className="text-[11px] text-amber-300">Giá ước tính – LayerLab sẽ xác nhận lại</p>}
                   <div className="mt-2 flex items-center gap-2">
                     <button onClick={() => setQty(i.key, i.qty - 1)} className="rounded-md bg-white/10 p-1"><Minus size={14} /></button>
                     <span className="w-6 text-center text-sm">{i.qty}</span>

@@ -8,7 +8,7 @@ import { Tag, useWset } from './wui.jsx'
 
 /** Đơn xưởng: tính giá gợi ý + giá vốn + lãi gộp; tự ghi Thu chi khi nhập "đã thu"; tự trừ nhựa khi hoàn thành */
 export default function WorkshopOrders() {
-  const [orders, setWo] = useStore('wo'), [stock, setStock] = useStore('ws'), [, setCash] = useStore('wc')
+  const [orders, setWo] = useStore('wo'), [stock, setStock] = useStore('ws'), [, setCash] = useStore('wc'), [printers] = useStore('printers')
   const S = useWset()
   const [fil, setFil] = useState(''), [q, setQ] = useState(''), [f, setF] = useState(null), [touched, setTouched] = useState(false)
   const ex = f && orders.find((x) => x.id === f.id)
@@ -58,7 +58,7 @@ export default function WorkshopOrders() {
             {I('date', 'Ngày', 'date')}{Sel('src', 'Nguồn', SRC)}{I('cust', 'Khách')}{I('name', 'Tên mẫu')}
             <div className="sm:col-span-2">{I('file', 'File in (tên file hoặc link)')}</div>
             {I('colors', 'Màu in (ghi rõ từng phần)')}{Sel('layer', 'Layer (mm)', ['0.28', '0.2', '0.12', '0.08'])}
-            {I('infill', 'Infill (%)', 'number')}{I('due', 'Hạn giao', 'date')}{Sel('prio', 'Ưu tiên', [['0', 'Thường'], ['1', 'Gấp']])}
+            {I('infill', 'Infill (%)', 'number')}{I('due', 'Hạn giao', 'date')}{Sel('printer', 'Máy in', [['', '— tự chọn máy đầu tiên —'], ...printers.filter((p) => p.active).map((p) => [p.id, p.name])])}{Sel('prio', 'Ưu tiên', [['0', 'Thường'], ['1', 'Gấp']])}
             {Sel('pkg', 'Gói in', Object.entries(PKG).map(([k, v]) => [k, v[0]]))}
             {Sel('spool', 'Cuộn nhựa dùng', [['', '— chưa chọn —'], ...stock.filter((s) => s.kind === 'filament').map((s) => [s.id, `${s.name} (còn ${s.qty}g)`])])}
             {I('g', 'Gram (cả support)', 'number')}{I('h', 'Giờ in', 'number')}{I('min', 'Phút làm tay', 'number')}

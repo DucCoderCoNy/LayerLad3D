@@ -16,7 +16,7 @@ export const isDone = (o) => ['Hoàn thành', 'Đã giao'].includes(o.status)
 export const uid = (p) => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
 
 export const BLANK = { src: SRC[0], cust: '', name: '', pkg: 'std', g: 0, h: 0, min: 30, col: 0, rush: 0, paint: 0, other: 0, price: 0, paid: 0,
-  status: 'Báo giá', spool: '', date: today(), note: '', file: '', colors: '', layer: '0.2', infill: 15, due: '', prio: '0' }
+  status: 'Báo giá', spool: '', date: today(), note: '', file: '', colors: '', layer: '0.2', infill: 15, due: '', prio: '0', printer: '' }
 
 /**
  * Tính giá: lấy số CAO NHẤT trong (theo gram, theo công thức setup+gram+giờ, tối thiểu) + phụ phí.
@@ -50,3 +50,8 @@ export function plan(orders, s) {
 }
 export const fmtDT = (t) => new Date(t).toLocaleString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 export const stockCost = (s, q) => (s.kind === 'filament' ? (s.price * q) / 1000 : s.price * q)
+
+/** Máy được gán cho đơn (chưa gán = máy đầu tiên đang hoạt động) */
+export const printerOf = (o, printers) => (printers.some((p) => p.id === o.printer) ? o.printer : printers.find((p) => p.active)?.id || printers[0]?.id || '')
+/** Lịch dự kiến của TẤT CẢ máy: [{ printer, plan:[{o,s,e,run,late}] }] – mỗi máy chạy hàng đợi riêng */
+export const planAll = (orders, s, printers) => printers.filter((p) => p.active).map((pr) => ({ printer: pr, plan: plan(orders.filter((o) => printerOf(o, printers) === pr.id), s) }))

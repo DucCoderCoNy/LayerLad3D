@@ -5,11 +5,19 @@ export const btn = 'rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-
 export const btn2 = 'rounded-xl border border-white/15 px-4 py-2.5 text-sm font-medium text-white transition hover:border-neon hover:text-neon'
 export const td = 'px-4 py-3'
 
+// Trạng thái đơn: Mới → Đã xác nhận → Đang chuẩn bị → Đang in → Hoàn thiện → Đang giao → Hoàn thành
 export const ORDER_STATUS = {
   new: ['Mới', 'bg-sky-500/20 text-sky-300'], confirmed: ['Đã xác nhận', 'bg-indigo-500/20 text-indigo-300'],
-  printing: ['Đang in', 'bg-accent/20 text-accent'], shipping: ['Đang giao', 'bg-amber-500/20 text-amber-300'],
+  preparing: ['Đang chuẩn bị', 'bg-violet-500/20 text-violet-300'],
+  printing: ['Đang in', 'bg-accent/20 text-accent'], finishing: ['Hoàn thiện', 'bg-fuchsia-500/20 text-fuchsia-300'], shipping: ['Đang giao', 'bg-amber-500/20 text-amber-300'],
   done: ['Hoàn thành', 'bg-emerald-500/20 text-emerald-300'], cancelled: ['Đã hủy', 'bg-red-500/20 text-red-300'],
 }
+export const FLOW = ['new', 'confirmed', 'preparing', 'printing', 'finishing', 'shipping', 'done']
+// Trạng thái thanh toán quản lý RIÊNG với trạng thái đơn
+export const PAY_STATUS = {
+  unpaid: ['Chưa thanh toán', 'bg-zinc-500/20 text-zinc-300'], paid: ['Đã thanh toán', 'bg-emerald-500/20 text-emerald-300'], refunded: ['Đã hoàn tiền', 'bg-red-500/20 text-red-300'],
+}
+export const payStatusOf = (o) => o?.payStatus || (o?.paid ? 'paid' : 'unpaid')
 export const REQ_STATUS = {
   pending: ['Chờ báo giá', 'bg-sky-500/20 text-sky-300'], quoted: ['Đã báo giá', 'bg-amber-500/20 text-amber-300'],
   accepted: ['Khách đồng ý', 'bg-indigo-500/20 text-indigo-300'], printing: ['Đang in', 'bg-accent/20 text-accent'],
@@ -23,7 +31,7 @@ export const Field = ({ label, children }) => (
 
 /** Ảnh sản phẩm: ảnh thật nếu có, không thì ô gradient + vạch lớp in */
 export const Thumb = ({ p, className = '' }) =>
-  p.image ? <img src={p.image} alt={p.name} className={`object-cover ${className}`} />
+  p.image ? <img src={p.image} alt={p.name} loading="lazy" decoding="async" className={`object-cover ${className}`} />
           : <div className={`layers-dark bg-gradient-to-br ${p.hue || 'from-accent to-amber-400'} ${className}`} />
 
 export function Modal({ title, onClose, children, wide }) {

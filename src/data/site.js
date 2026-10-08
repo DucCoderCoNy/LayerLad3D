@@ -11,5 +11,10 @@ export const SITE = {
 export const NAV = [
   { to: '/', label: 'Trang chủ' },
   { to: '/shop', label: 'Cửa hàng' },
-  { to: '/custom', label: 'In theo yêu cầu' },
+  { to: '/custom', label: 'In theo file' },
+  { to: '/thiet-ke', label: 'Tự thiết kế' },
+  { to: '/tin-tuc', label: 'Tin tức' },
+  { to: '/thu-vien', label: 'Thư viện' },
+  { to: '/tra-cuu', label: 'Tra cứu đơn' },
+  { to: '/lien-he', label: 'Liên hệ' },
 ]

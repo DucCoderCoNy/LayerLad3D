@@ -23,4 +23,4 @@ export const PRODUCTS = [
     desc: 'Quay êm nhờ vòng bi 608, in PLA nhiều màu.' },
 ]
 
-export const formatVND = (n) => new Intl.NumberFormat('vi-VN').format(n) + '₫'
+export const formatVND = (n) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(Math.round(+n || 0)) + '₫'

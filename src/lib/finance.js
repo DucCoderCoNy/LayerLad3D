@@ -1,24 +1,33 @@
 // Số liệu doanh thu / chi phí / lợi nhuận theo khoảng thời gian (dùng cho Tổng quan & Báo cáo)
 import { payStatusOf } from '../components/ui.jsx'
+import { orderCost } from './orderTools.js'
 
 export const dayKey = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 export const inRange = (key, from, to) => (!from || key >= from) && (!to || key <= to)
 export const sum = (a, f) => a.reduce((s, x) => s + f(x), 0)
 export const ACTIVE = ['new', 'confirmed', 'preparing', 'printing', 'finishing', 'shipping'] // đơn đang xử lý
 
-/** from/to dạng 'YYYY-MM-DD' (bao gồm hai đầu). Doanh thu = đơn web không hủy + đơn xưởng không huỷ (đơn web đã chuyển sang xưởng chỉ tính 1 lần).
- *  Chi phí thực = sổ Thu chi (loại 'out'); chia nhóm nhựa / điện / khác. Giá vốn ước tính chỉ có ở đơn xưởng. */
-export function periodStats({ orders, wo, wc }, from, to) {
+/** from/to dạng 'YYYY-MM-DD' (bao gồm hai đầu).
+ *  Doanh thu = đơn web không hủy + đơn xưởng không huỷ (đơn web đã chuyển sang xưởng chỉ tính 1 lần).
+ *  Hai cách nhìn tiền – TÁCH RIÊNG để không nhầm:
+ *   • Lãi ước tính (dồn tích) = doanh thu − giá vốn hàng đã bán (nhựa + điện + máy thực dùng, ước tính) − chi phí vận hành khác.
+ *   • Dòng tiền ròng = tiền đã thu − MỌI khoản đã chi (kể cả mua cuộn nhựa dự trữ chưa dùng hết).
+ *  Mua nhựa dự trữ là tài sản (nằm trong kho), không phải chi phí của đơn đã bán; chỉ phần nhựa dùng cho đơn mới thành giá vốn. */
+export function periodStats({ orders, wo, wc, products = [], wset = {}, ws = [] }, from, to) {
   const web = orders.filter((o) => o.status !== 'cancelled' && inRange(dayKey(o.createdAt), from, to) && !o.wo)
   const shop = wo.filter((o) => o.status !== 'Huỷ' && inRange(o.date || '', from, to))
   const out = wc.filter((c) => c.type === 'out' && inRange(c.date || '', from, to))
   const cat = (re) => sum(out.filter((c) => re.test(c.cat || '')), (c) => c.amount)
   const revenue = sum(web, (o) => o.total) + sum(shop, (o) => o.price)
   const filament = cat(/nhựa/i), power = cat(/điện/i), expense = sum(out, (c) => c.amount), other = expense - filament - power
-  const est = sum(shop, (o) => o.cost || 0)
+  const webCosts = web.map((o) => orderCost(o, products, wset, ws))
+  const cogs = sum(shop, (o) => o.cost || 0) + sum(webCosts, (c) => c?.cost || 0)
+  const noCost = web.filter((_, i) => !webCosts[i]).length + shop.filter((o) => !(o.cost > 0)).length
+  const collected = sum(web.filter((o) => payStatusOf(o) === 'paid'), (o) => o.total) + sum(shop, (o) => o.paid || 0)
   return {
-    revenue, orders: web.length + shop.length, collected: sum(web.filter((o) => payStatusOf(o) === 'paid'), (o) => o.total) + sum(shop, (o) => o.paid || 0),
-    filament, power, other, expense, profit: revenue - expense, grossProfit: revenue - est, estCost: est,
+    revenue, orders: web.length + shop.length, collected, filament, power, other, expense, cogs, noCost,
+    profit: revenue - cogs - other, cashflow: collected - expense,
+    stockValue: sum(ws.filter((s) => s.kind === 'filament'), (s) => (s.qty * s.price) / 1000),
     processing: orders.filter((o) => ACTIVE.includes(o.status)).length,
   }
 }

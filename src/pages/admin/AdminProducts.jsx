@@ -4,6 +4,8 @@ import { formatVND } from '../../data/products.js'
 import { uid, useStore } from '../../lib/store.js'
 import { uploadImage } from '../../lib/upload.js'
 import { slugify } from '../../lib/seo.js'
+import ProductImport, { HEADERS } from './ProductImport.jsx'
+import { downloadCSV } from '../../lib/export.js'
 import { DataTable, Field, Modal, Thumb, btn, btn2, inp, td } from '../../components/ui.jsx'
 
 const EMPTY = { name: '', slug: '', category: '', price: 39000, stock: 20, hot: false, active: true, desc: '', image: '', images: [], colorIds: [], grams: 0, material: 'PLA', hue: 'from-accent to-amber-400' }
@@ -12,7 +14,7 @@ const PAGE = 15
 
 export default function AdminProducts() {
   const [products, setProducts] = useStore('products'), [CATEGORIES] = useStore('categories'), [colors] = useStore('colors')
-  const [busy, setBusy] = useState(false), [err, setErr] = useState(''), [edit, setEdit] = useState(null), [q, setQ] = useState(''), [page, setPage] = useState(1)
+  const [imp, setImp] = useState(false), [busy, setBusy] = useState(false), [err, setErr] = useState(''), [edit, setEdit] = useState(null), [q, setQ] = useState(''), [page, setPage] = useState(1)
   const set = (k, v) => setEdit((c) => ({ ...c, [k]: v }))
   const imgs = edit ? (edit.images?.length ? edit.images : edit.image ? [edit.image] : []) : []
 
@@ -45,6 +47,8 @@ export default function AdminProducts() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-3xl font-bold text-white">Sản phẩm</h1>
         <div className="flex gap-2"><input value={q} onChange={(e) => { setQ(e.target.value); setPage(1) }} placeholder="Tìm…" className={`${inp} w-48`} />
+          <button onClick={() => setImp(true)} className={btn2}>Nhập CSV</button>
+          <button onClick={() => downloadCSV('san-pham.csv', [HEADERS, ...products.map((p) => [p.name, CATEGORIES.find((c) => c.id === p.category)?.label || p.category, p.price, p.stock, p.desc, p.grams || 0, p.material || 'PLA', (p.images?.length ? p.images : p.image ? [p.image] : []).join('|'), (p.colorIds || []).map((id) => colors.find((c) => c.id === id)?.name).filter(Boolean).join('|'), p.slug || '', p.active ? 1 : 0])])} className={btn2}>Xuất CSV</button>
           <button onClick={() => open()} className={`${btn} flex items-center gap-1`}><Plus size={16} />Thêm</button></div>
       </div>
       <DataTable heads={['Ảnh', 'Tên', 'Danh mục', 'Giá', 'Kho', 'Trạng thái', '']}>
@@ -62,6 +66,7 @@ export default function AdminProducts() {
           </tr>))}
       </DataTable>
       {pages > 1 && <div className="flex items-center justify-center gap-3 text-sm"><button disabled={cur <= 1} onClick={() => setPage(cur - 1)} className={btn2}>‹</button>Trang {cur}/{pages}<button disabled={cur >= pages} onClick={() => setPage(cur + 1)} className={btn2}>›</button></div>}
+      {imp && <ProductImport onClose={() => setImp(false)} />}
       {edit && (
         <Modal title={edit.id ? 'Sửa sản phẩm' : 'Thêm sản phẩm'} onClose={() => setEdit(null)} wide>
           <form onSubmit={save} className="grid gap-4 sm:grid-cols-2">

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { FileUp } from 'lucide-react'
 import { useCart } from '../context/CartContext.jsx'
 import { formatVND } from '../data/products.js'
@@ -72,6 +73,16 @@ export default function CustomRel() {
               <div><p className="text-zinc-500">Kích thước</p><b className="text-white">{info.size ? info.size.map((v) => Math.round(v)).join('×') + ' mm' : '—'}</b></div>
               <div><p className="text-zinc-500">Số tam giác</p><b className="text-white">{info.triangles.toLocaleString('vi-VN')}</b></div>
             </div>)}
+          <details className="rounded-xl border border-white/10 bg-ink-800 p-4 text-sm text-zinc-400">
+            <summary className="cursor-pointer font-medium text-zinc-200">Mẹo chuẩn bị file để in đẹp, giá đúng</summary>
+            <ul className="mt-3 list-disc space-y-1 pl-5">
+              <li>Xuất file theo đơn vị <b className="text-zinc-200">milimét</b> và đúng kích thước muốn in.</li>
+              <li>Mô hình nên là khối kín, không có lỗ hở hay mặt bị lật.</li>
+              <li>Chi tiết mảnh dưới 1 mm hoặc phần nhô ra dài có thể cần support hoặc không in được; ghi chú để xưởng tư vấn.</li>
+              <li>Chưa rõ chọn nhựa nào? Xem <Link to="/tin-tuc/chon-nhua-nao" className="text-accent hover:underline">so sánh PLA, PETG, ABS</Link>.</li>
+              <li>Chưa có file? Tích "cần hỗ trợ thiết kế" và mô tả món đồ ở ô ghi chú.</li>
+            </ul>
+          </details>
           {busy && !uploaded && <p className="text-sm text-zinc-400">Đang xử lý…</p>}
           {err && <p className="text-sm text-amber-400">{err}</p>}
           <div className="grid gap-4 sm:grid-cols-2">
@@ -99,6 +110,7 @@ export default function CustomRel() {
           </dl>
           <p className="border-t border-white/10 pt-3 font-display text-3xl font-bold text-accent">{formatVND(price * f.qty)}</p>
           <button disabled={!canAdd} onClick={add} className={`${btn} w-full`}>{busy ? 'Đang tải file…' : 'Thêm vào giỏ hàng'}</button>
+          <p className="text-xs text-zinc-500">Sản phẩm làm riêng theo yêu cầu: thanh toán 100% bằng chuyển khoản trước, xưởng bắt đầu in khi nhận được tiền.</p>
           <p className="text-xs leading-relaxed text-zinc-500">Khối lượng và thời gian chỉ là ước tính từ thể tích file. Giá cuối cùng do LayerLab 3D xác nhận sau khi kiểm tra file (mô hình lỗi, cần support, nhiều chi tiết…). Chúng tôi sẽ liên hệ trước khi in nếu giá chênh lệch đáng kể.</p>
         </aside>
       </div>

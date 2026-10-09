@@ -1,0 +1,18 @@
+{
+  "name": "LayerLab 3D",
+  "short_name": "LayerLab",
+  "description": "In 3D theo yêu cầu, móc khóa tên, thời khóa biểu module",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0c0f",
+  "theme_color": "#0a0c0f",
+  "lang": "vi",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

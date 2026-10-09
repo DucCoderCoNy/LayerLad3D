@@ -20,13 +20,13 @@ export const orderOut = (r) => ({
   id: r.code, uuid: r.id, userId: r.user_id, status: r.status, paid: r.payment_status === 'paid', payment_status: r.payment_status,
   customer: { name: r.customer_name, phone: r.phone, address: r.address, note: r.note, payment: r.payment_method, zone: r.zone_id, email: r.email },
   items: (r.order_items || []).map((i) => ({ key: i.id, id: i.product_id || i.kind, name: i.name, color: i.color || '', qty: i.qty, price: Number(i.unit_price), kind: i.kind, options: i.options })),
-  subtotal: Number(r.subtotal), ship: Number(r.ship_fee), total: Number(r.total), createdAt: ms(r.created_at), tracking_code: r.tracking_code, shipping_provider: r.shipping_provider,
+  subtotal: Number(r.subtotal), ship: Number(r.ship_fee), discount: Number(r.discount || 0), total: Number(r.total), createdAt: ms(r.created_at), tracking_code: r.tracking_code, shipping_provider: r.shipping_provider,
 })
 const trackOut = (t) => ({
   id: t.code, status: t.status, paid: t.payment_status === 'paid', payment_status: t.payment_status,
-  customer: { name: t.customer_name, payment: t.payment_method }, subtotal: Number(t.subtotal), ship: Number(t.ship_fee), total: Number(t.total), createdAt: ms(t.created_at),
+  customer: { name: t.customer_name, payment: t.payment_method }, subtotal: Number(t.subtotal), ship: Number(t.ship_fee), discount: Number(t.discount || 0), total: Number(t.total), createdAt: ms(t.created_at),
   tracking_code: t.tracking_code, shipping_provider: t.shipping_provider,
-  items: (t.items || []).map((i, k) => ({ key: k, name: i.name, color: i.color || '', qty: i.qty, price: Number(i.unit_price) })),
+  items: (t.items || []).map((i, k) => ({ key: k, kind: i.kind, name: i.name, color: i.color || '', qty: i.qty, price: Number(i.unit_price) })),
 })
 
 /* ---------- Đọc ---------- */
@@ -42,7 +42,7 @@ export const relLoad = {
   },
   async showcase() {
     return must(await supa.from('reviews').select('*').order('created_at', { ascending: false })).map((r) => ({
-      id: r.id, title: r.title || '', image: r.image_url || '', customer: r.name || '', quote: r.comment || '', rating: r.rating, active: r.status === 'approved' }))
+      id: r.id, title: r.title || '', image: r.image_url || '', customer: r.name || '', quote: r.comment || '', rating: r.rating, active: r.status === 'approved', pending: r.status === 'pending' }))
   },
   async settings(def) { const d = must(await supa.from('settings').select('value').eq('key', 'main').maybeSingle()); return { ...def, ...(d?.value || {}) } },
   async orders() { // đơn của chính người đăng nhập (admin dùng trang Đơn hàng riêng, có phân trang)
@@ -140,9 +140,9 @@ export async function placeOrderRel(o) {
     return { kind: 'product', product_id: i.uuid, color: i.color, qty: i.qty }
   })
   const c = o.customer
-  const { data, error } = await supa.rpc('place_order_v2', { payload: { customer: { name: c.name, phone: c.phone, email: c.email || '', address: c.address, note: c.note, zone: c.zone }, payment_method: c.payment, items } })
+  const { data, error } = await supa.rpc('place_order_v2', { payload: { customer: { name: c.name, phone: c.phone, email: c.email || '', address: c.address, note: c.note, zone: c.zone }, payment_method: c.payment, voucher: o.voucher || '', items } })
   if (error) throw new Error(error.message)
   let order = null
   try { order = await trackRel(data.code, c.phone) } catch { /* dùng dữ liệu tạm bên dưới */ }
-  return order || { id: data.code, status: 'new', paid: false, customer: { ...c }, items: o.items.map(({ image, ...i }) => i), subtotal: data.subtotal, ship: data.ship_fee, total: data.total, createdAt: Date.now() }
+  return order || { id: data.code, status: 'new', paid: false, customer: { ...c }, items: o.items.map(({ image, ...i }) => i), subtotal: data.subtotal, ship: data.ship_fee, discount: data.discount, total: data.total, createdAt: Date.now() }
 }

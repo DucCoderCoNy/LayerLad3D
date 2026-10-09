@@ -7,6 +7,7 @@ import { downloadCSV, printSlips } from '../../lib/export.js'
 import { addWorkshopOrder } from '../../lib/bridge.js'
 import { deductForOrder, restoreForOrder, usageOf } from '../../lib/filament.js'
 import { dayKey, inRange } from '../../lib/finance.js'
+import ManualOrder from './ManualOrder.jsx'
 import { safeUrl } from '../../components/OrderTracking.jsx'
 import { needsPriceConfirm, orderCost, templates, zaloLink } from '../../lib/orderTools.js'
 import { SHIPPING_PROVIDERS } from '../../lib/payments.js'
@@ -18,8 +19,12 @@ const PAGE = 20
 export default function AdminOrders() {
   const [orders, setOrders] = useStore('orders'), [products, setProducts] = useStore('products'), [st] = useStore('settings')
   const [sp] = useSearchParams(), [wset] = useStore('wset'), [stock] = useStore('ws')
-  const [sel, setSel] = useState(null), [filter, setFilter] = useState(sp.get('status') || ''), [payF, setPayF] = useState(sp.get('pay') || ''), [need, setNeed] = useState(sp.get('need') === 'price'), [pick, setPick] = useState([]), [bulk, setBulk] = useState(''), [q, setQ] = useState(''), [range, setRange] = useState(['', '']), [page, setPage] = useState(1), [msg, setMsg] = useState('')
+  const [sel, setSel] = useState(null), [filter, setFilter] = useState(sp.get('status') || ''), [payF, setPayF] = useState(sp.get('pay') || ''), [need, setNeed] = useState(sp.get('need') === 'price'), [pick, setPick] = useState([]), [manual, setManual] = useState(false), [bulk, setBulk] = useState(''), [q, setQ] = useState(''), [range, setRange] = useState(['', '']), [page, setPage] = useState(1), [msg, setMsg] = useState('')
   const o = orders.find((x) => x.id === sel)
+  const createManual = (n) => { // trừ tồn kho cho sản phẩm chọn từ kho, rồi thêm đơn vào đầu danh sách
+    setProducts((c) => c.map((p) => { const q = n.items.filter((i) => i.id === p.id).reduce((t, i) => t + i.qty, 0); return q ? { ...p, stock: Math.max(0, p.stock - q) } : p }))
+    setOrders((c) => [n, ...c]); setManual(false); setSel(n.id); setMsg('Đã tạo đơn. Khách tra cứu được bằng mã đơn + số điện thoại.')
+  }
   const patch = (id, d) => setOrders((c) => c.map((x) => (x.id === id ? { ...x, ...d } : x)))
   /** Ghi lịch sử thao tác của đơn (ai/lúc nào/đổi gì) */
   const hist = (o, text) => [...(o.history || []), { t: Date.now(), text }].slice(-50)
@@ -63,7 +68,7 @@ export default function AdminOrders() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-3xl font-bold text-white">Đơn hàng</h1>
-        <div className="flex flex-wrap gap-2"><button onClick={() => printSlips(shown, st)} className={btn2}>In phiếu giao ({shown.length})</button><button onClick={exportXls} className={btn2}>Xuất Excel (CSV)</button></div>
+        <div className="flex flex-wrap gap-2"><button onClick={() => setManual(true)} className={btn}>+ Tạo đơn thủ công</button><button onClick={() => printSlips(shown, st)} className={btn2}>In phiếu giao ({shown.length})</button><button onClick={exportXls} className={btn2}>Xuất Excel (CSV)</button></div>
       </div>
       <div className="space-y-3 rounded-2xl border border-white/10 bg-ink-800 p-4">
         <DateRange value={range} onChange={(r) => { setRange(r); setPage(1) }} />
@@ -90,8 +95,9 @@ export default function AdminOrders() {
             <td className={td}>{formatVND(x.total)}</td><td className={td}><Badge map={ORDER_STATUS} v={x.status} /></td></tr>))}
       </DataTable>
       {pages > 1 && <div className="flex items-center justify-center gap-3 text-sm"><button disabled={cur <= 1} onClick={() => setPage(cur - 1)} className={btn2}>‹</button>Trang {cur}/{pages} ({shown.length} đơn)<button disabled={cur >= pages} onClick={() => setPage(cur + 1)} className={btn2}>›</button></div>}
+      {manual && <ManualOrder onClose={() => setManual(false)} onCreate={createManual} />}
       {o && (
-        <Modal title={`Đơn ${o.id}`} onClose={() => setSel(null)} wide>
+        <Modal title={`Đơn ${o.id}${o.manual ? ` · ${o.source || 'thủ công'}` : ''}`} onClose={() => setSel(null)} wide>
           <div className="space-y-4 text-sm">
             <div className="rounded-lg bg-ink-900 p-3 text-zinc-300">{o.customer.name} · {o.customer.phone}<br />{o.customer.address}{o.customer.note && <><br /><i className="text-zinc-500">Ghi chú: {o.customer.note}</i></>}</div>
             <ul className="space-y-3">{o.items.map((i, k) => (

@@ -27,6 +27,10 @@ Không có file `.env` -> dữ liệu lưu trong trình duyệt. Admin mặc đ�
 ## Công cụ quản lý cho chủ xưởng (Admin)
 - **Việc cần làm hôm nay** (đầu trang Tổng quan): đơn mới chưa xác nhận, đơn in theo yêu cầu chưa chốt giá, chuyển khoản quá 12 giờ chưa thấy tiền, đơn hoàn thành chưa ghi thanh toán, đơn giao quá 7 ngày, đơn xưởng trễ hạn, nhựa/sản phẩm sắp hết. Bấm "Xử lý" nhảy thẳng tới danh sách đã lọc.
 - **Theo dõi vận chuyển cho khách**: trong chi tiết đơn → khung "Vận chuyển" nhập đơn vị, mã vận đơn, link theo dõi của đơn vị vận chuyển và ghi chú. Khách thấy ngay ở Tài khoản (bấm vào đơn), trang Tra cứu đơn và trang đơn hàng. Chỉ chấp nhận link http/https.
+- **Tiền: lãi vs dòng tiền** (Tổng quan): *Lãi ước tính* = doanh thu − giá vốn hàng đã bán − chi phí vận hành khác; *Dòng tiền ròng* = tiền đã thu − mọi khoản chi (kể cả mua cuộn nhựa dự trữ). Mua nhựa dự trữ làm dòng tiền giảm nhưng không làm lãi giảm; có thêm ô "Nhựa còn trong kho" (giá trị tài sản). Biểu đồ có trục tiền và số tiền trên đầu cột.
+- **Phân tích bán hàng** (Bán hàng → Phân tích): sản phẩm/màu bán chạy, khách mua nhiều, khách quay lại, giá trị đơn trung bình, tỉ lệ hủy, cơ cấu thanh toán – theo khoảng ngày.
+- **Tạo đơn thủ công** (Đơn hàng → "+ Tạo đơn thủ công"): nhập đơn từ Zalo/Facebook/trực tiếp; chọn sản phẩm từ kho (tự trừ tồn) hoặc nhập món tự do; khách tra cứu được bằng mã đơn + SĐT.
+- **Nhập/xuất sản phẩm CSV** (Sản phẩm): tải file mẫu, xem trước và báo lỗi từng dòng trước khi nhập; chọn cập nhật hoặc bỏ qua sản phẩm trùng.
 - **Chốt giá in theo yêu cầu**: trong chi tiết đơn, kiểm tra file rồi nhập giá chốt / sản phẩm; tổng đơn tự tính lại và khách thấy giá không còn là "ước tính".
 - **Tin nhắn mẫu**: xác nhận đơn, báo giá, nhắc chuyển khoản, đã gửi hàng, xin đánh giá – bấm Copy hoặc mở Zalo của khách.
 - **Lịch sử đơn**: ghi lại đổi trạng thái, đổi thanh toán, chốt giá.

@@ -8,7 +8,7 @@ import { btn } from '../../components/ui.jsx'
 // Menu gom nhóm: mục có `items` là nhóm (rê chuột / bấm để xổ danh sách), mục không có là liên kết đơn
 const MENU = [
   { to: '/admin', label: 'Tổng quan', icon: LayoutDashboard, end: true },
-  { label: 'Bán hàng', icon: ClipboardList, items: [['/admin/orders', 'Đơn hàng', ClipboardList], ['/admin/customers', 'Khách hàng', Contact], ['/admin/requests', 'Yêu cầu báo giá', FileUp]] },
+  { label: 'Bán hàng', icon: ClipboardList, items: [['/admin/orders', 'Đơn hàng', ClipboardList], ['/admin/customers', 'Khách hàng', Contact], ['/admin/insights', 'Phân tích bán hàng', BarChart3], ['/admin/requests', 'Yêu cầu báo giá', FileUp]] },
   { label: 'Sản phẩm', icon: Boxes, items: [['/admin/products', 'Sản phẩm', Boxes], ['/admin/categories', 'Danh mục', Tags], ['/admin/colors', 'Màu nhựa', Palette]] },
   { label: 'Xưởng in', icon: Printer, items: [['/admin/workshop', 'Đơn xưởng', Printer], ['/admin/printers', 'Máy in', Printer], ['/admin/queue', 'Hàng đợi in', CalendarClock], ['/admin/calendar', 'Lịch in', CalendarDays]] },
   { label: 'Kho & tài chính', icon: Wallet, items: [['/admin/stock', 'Kho nhựa & vật tư', Package], ['/admin/cash', 'Thu chi', Wallet], ['/admin/report', 'Báo cáo tháng', BarChart3], ['/admin/costing', 'Giá vốn & sao lưu', Calculator]] },

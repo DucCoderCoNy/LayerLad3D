@@ -7,6 +7,7 @@ import { must, useAsync } from '../../lib/useAsync.js'
 import { downloadCSV, printSlips } from '../../lib/export.js'
 import { Badge, DataTable, Field, Modal, ORDER_STATUS, PAY_STATUS, btn, btn2, inp, td } from '../../components/ui.jsx'
 
+const isCustom = (o) => (o.order_items || []).some((i) => i.kind && i.kind !== 'product')
 const FLOW = ['new', 'confirmed', 'preparing', 'printing', 'finishing', 'shipping', 'done', 'cancelled']
 const PAGE = 20
 const dt = (d, end) => new Date(d + (end ? 'T23:59:59' : 'T00:00:00')).toISOString()
@@ -24,7 +25,7 @@ const withFilters = (q, f) => {
 export default function AdminOrdersV2() {
   const [st] = useStore('settings'), [f, setF] = useState({ status: '', pay: '', from: '', to: '', q: '' }), [page, setPage] = useState(0), [sel, setSel] = useState(null)
   const list = useAsync(async () => {
-    const { data, error, count } = await withFilters(supa.from('orders').select('*, order_items(name,color,qty,unit_price)', { count: 'exact' }).order('created_at', { ascending: false }).range(page * PAGE, page * PAGE + PAGE - 1), f)
+    const { data, error, count } = await withFilters(supa.from('orders').select('*, order_items(name,color,qty,unit_price,kind)', { count: 'exact' }).order('created_at', { ascending: false }).range(page * PAGE, page * PAGE + PAGE - 1), f)
     if (error) throw error
     return { rows: data, count }
   }, [f, page])
@@ -54,7 +55,7 @@ export default function AdminOrdersV2() {
       <DataTable heads={['Mã', 'Ngày', 'Khách', 'Tổng', 'Thanh toán', 'Trạng thái']} empty={list.loading ? 'Đang tải…' : 'Không có đơn phù hợp'}>
         {rows.map((o) => (
           <tr key={o.id} onClick={() => setSel(o.id)} className="cursor-pointer">
-            <td className={`${td} font-medium text-white`}>{o.code}</td><td className={td}>{new Date(o.created_at).toLocaleDateString('vi-VN')}</td>
+            <td className={`${td} font-medium text-white`}>{o.code}{isCustom(o) && <span className="ml-2 rounded bg-sky-500/20 px-1.5 text-xs text-sky-300">Tùy biến</span>}{isCustom(o) && o.payment_status !== 'paid' && o.status !== 'cancelled' && <span className="ml-1 rounded bg-amber-500/20 px-1.5 text-xs text-amber-300">Chờ tiền</span>}</td><td className={td}>{new Date(o.created_at).toLocaleDateString('vi-VN')}</td>
             <td className={td}>{o.customer_name}<br /><span className="text-xs text-zinc-500">{o.phone}</span></td><td className={td}>{formatVND(o.total)}</td>
             <td className={td}>{o.payment_method === 'bank' ? 'CK' : 'COD'} · <Badge map={PAY_STATUS} v={o.payment_status} /></td><td className={td}><Badge map={ORDER_STATUS} v={o.status} /></td>
           </tr>))}
@@ -78,6 +79,7 @@ function OrderDetail({ id, st, onClose, onChanged }) {
   const saveTrack = () => run(async () => must(await supa.from('orders').update({ shipping_provider: track.p || null, tracking_code: track.c || null }).eq('id', id)), 'Đã lưu vận đơn')
   const download = async (path) => { const { data, error } = await supa.storage.from('stl-files').createSignedUrl(path, 300); error ? setMsg('Không tạo được link tải: ' + error.message) : window.open(data.signedUrl, '_blank') }
   const toQueue = (it) => run(async () => {
+    if (isCustom(o) && o.payment_status !== 'paid' && !confirm('Đơn này chưa thanh toán. Vẫn đưa vào hàng đợi in?')) return
     const g = Number(it.options?.grams) || null, h = Number(it.options?.hours) || null
     must(await supa.from('print_queue').insert({ order_id: id, order_item_id: it.id, est_grams: g && g * it.qty, est_hours: h && h * it.qty }))
   }, 'Đã đưa vào hàng đợi in (xem mục Máy in & lịch in)')
@@ -86,6 +88,7 @@ function OrderDetail({ id, st, onClose, onChanged }) {
       {d.error && <p className="text-red-400">{d.error.message}</p>}
       {o && (
         <div className="space-y-4 text-sm">
+          {isCustom(o) && o.payment_status !== 'paid' && o.status !== 'cancelled' && <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-amber-200">Đơn làm riêng chưa nhận tiền. Quy định: chỉ bắt đầu in khi khách đã chuyển khoản 100%. Kiểm tra tài khoản ngân hàng rồi đổi "Trạng thái thanh toán" sang Đã thanh toán.</p>}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl bg-ink-900 p-3"><p className="text-xs text-zinc-500">Khách</p><b className="text-white">{o.customer_name}</b> · {o.phone}<br />{o.address}{o.note && <p className="mt-1 text-amber-300">Ghi chú: {o.note}</p>}</div>
             <div className="rounded-xl bg-ink-900 p-3 text-zinc-300"><p className="text-xs text-zinc-500">Thanh toán</p>{o.payment_method === 'bank' ? 'Chuyển khoản' : 'COD'} · Tổng <b className="text-accent">{formatVND(o.total)}</b> (ship {formatVND(o.ship_fee)})</div>

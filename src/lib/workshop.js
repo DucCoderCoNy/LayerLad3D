@@ -1,5 +1,16 @@
 // Logic quản lý xưởng in 3D (tính giá, giá vốn, xếp lịch máy) – chuyển từ file quan-ly-in3d.html
 export const ST = ['Báo giá', 'Đã cọc', 'Chờ in', 'Đang in', 'Hoàn thành', 'Đã giao', 'Huỷ']
+// Màu cho từng trạng thái đơn xưởng (viết đủ tên class để Tailwind nhận diện): badge = nhãn, dot = chấm, bar = viền cột/dòng, sel = ô chọn, chipOn = nút lọc đang chọn
+export const ST_STYLE = {
+  'Báo giá': { badge: 'bg-sky-500/20 text-sky-300', dot: 'bg-sky-400', bar: 'border-sky-400', sel: 'border-sky-500/50 bg-sky-500/10 text-sky-200', chipOn: 'bg-sky-400 text-ink-950' },
+  'Đã cọc': { badge: 'bg-violet-500/20 text-violet-300', dot: 'bg-violet-400', bar: 'border-violet-400', sel: 'border-violet-500/50 bg-violet-500/10 text-violet-200', chipOn: 'bg-violet-400 text-ink-950' },
+  'Chờ in': { badge: 'bg-amber-500/20 text-amber-300', dot: 'bg-amber-400', bar: 'border-amber-400', sel: 'border-amber-500/50 bg-amber-500/10 text-amber-200', chipOn: 'bg-amber-400 text-ink-950' },
+  'Đang in': { badge: 'bg-accent/20 text-accent', dot: 'bg-accent', bar: 'border-accent', sel: 'border-accent/50 bg-accent/10 text-accent', chipOn: 'bg-accent text-ink-950' },
+  'Hoàn thành': { badge: 'bg-emerald-500/20 text-emerald-300', dot: 'bg-emerald-400', bar: 'border-emerald-400', sel: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200', chipOn: 'bg-emerald-400 text-ink-950' },
+  'Đã giao': { badge: 'bg-teal-500/20 text-teal-300', dot: 'bg-teal-400', bar: 'border-teal-500', sel: 'border-teal-500/50 bg-teal-500/10 text-teal-200', chipOn: 'bg-teal-400 text-ink-950' },
+  'Huỷ': { badge: 'bg-rose-500/20 text-rose-300', dot: 'bg-rose-400', bar: 'border-rose-500', sel: 'border-rose-500/50 bg-rose-500/10 text-rose-200', chipOn: 'bg-rose-400 text-ink-950' },
+}
+export const stStyle = (s) => ST_STYLE[s] || ST_STYLE['Báo giá']
 export const SRC = ['Theo yêu cầu', 'Website', 'Shopee', 'Facebook/Zalo', 'Đơn ngoài khác']
 export const PKG = { std: ['Tiêu chuẩn', 'pStd'], str: ['Chịu lực', 'pStr'], hi: ['Độ nét cao', 'pHi'], ext: ['Đơn ngoài / nhập giá tay', null] }
 export const DEFSET = { pStd: 1100, pStr: 1600, pHi: 2200, setup: 50000, perG: 350, perH: 5000, min: 70000,
@@ -15,7 +26,7 @@ export const owed = (o) => (o.status === 'Huỷ' ? 0 : Math.max(0, o.price - o.p
 export const isDone = (o) => ['Hoàn thành', 'Đã giao'].includes(o.status)
 export const uid = (p) => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
 
-export const BLANK = { src: SRC[0], cust: '', name: '', pkg: 'std', g: 0, h: 0, min: 30, col: 0, rush: 0, paint: 0, other: 0, price: 0, paid: 0,
+export const BLANK = { src: SRC[0], cust: '', phone: '', name: '', pkg: 'std', g: 0, h: 0, min: 30, col: 0, rush: 0, paint: 0, other: 0, price: 0, paid: 0,
   status: 'Báo giá', spool: '', date: today(), note: '', file: '', colors: '', layer: '0.2', infill: 15, due: '', prio: '0', printer: '' }
 
 /**

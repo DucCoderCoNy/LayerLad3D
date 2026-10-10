@@ -5,6 +5,7 @@ import { formatVND } from '../data/products.js'
 import { useStore } from '../lib/store.js'
 import { Badge, ORDER_STATUS, PAY_STATUS, REQ_STATUS, btn2, payStatusOf } from '../components/ui.jsx'
 import { ShipBox, Steps } from '../components/OrderTracking.jsx'
+import { dueOf, paidOf } from '../lib/receivables.js'
 
 export default function Account() {
   const { user, logout, ready } = useAuth()
@@ -33,7 +34,7 @@ export default function Account() {
                 <Steps status={o.status} />
                 <ShipBox o={o} />
                 <ul className="space-y-1">{o.items.map((i, k) => <li key={k} className="flex justify-between gap-3"><span className="text-zinc-300">{i.name}{i.color ? ` (${i.color})` : ''} × {i.qty}</span><span>{formatVND(i.price * i.qty)}</span></li>)}</ul>
-                <p className="flex flex-wrap items-center gap-2 text-zinc-500">Thanh toán: <Badge map={PAY_STATUS} v={payStatusOf(o)} /> · Giao đến: {o.customer?.address}</p>
+                <p className="flex flex-wrap items-center gap-2 text-zinc-500">Thanh toán: <Badge map={PAY_STATUS} v={payStatusOf(o)} />{paidOf(o) > 0 && dueOf(o) > 0 && <span className="text-zinc-300">đã trả {formatVND(paidOf(o))}, còn {formatVND(dueOf(o))}</span>} · Giao đến: {o.customer?.address}</p>
                 {o.items.some((i) => i.cfg?.estimate) && <p className="rounded-lg bg-amber-500/10 p-3 text-xs text-amber-200">Món in theo yêu cầu đang ở giá ước tính, LayerLab 3D sẽ xác nhận lại sau khi kiểm tra file.</p>}
                 <Link to={`/order/${o.id}`} className="text-accent">Xem trang đơn hàng / mã QR thanh toán →</Link>
               </div>)}

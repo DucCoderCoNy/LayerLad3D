@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { formatVND } from '../../data/products.js'
 import { useStore } from '../../lib/store.js'
 import { todoItems } from '../../lib/orderTools.js'
+import { rulesOf } from '../../lib/rules.js'
+import { dueOf } from '../../lib/receivables.js'
 import { useWset } from './wui.jsx'
 import { dayKey, periodStats, presetRange } from '../../lib/finance.js'
 import BarChart from '../../components/BarChart.jsx'
@@ -11,7 +13,7 @@ import WorkshopSummary from './WorkshopSummary.jsx'
 import { Badge, ORDER_STATUS, DataTable, PAY_STATUS, payStatusOf, td } from '../../components/ui.jsx'
 
 export default function Dashboard() {
-  const [orders] = useStore('orders'), [ws] = useStore('ws'), [printers] = useStore('printers'), wset = useWset(), [wo] = useStore('wo'), [wc] = useStore('wc'), [products] = useStore('products'), [reqs] = useStore('requests')
+  const [orders] = useStore('orders'), [ws] = useStore('ws'), [printers] = useStore('printers'), wset = useWset(), [wo] = useStore('wo'), [wc] = useStore('wc'), [products] = useStore('products'), [st] = useStore('settings'), [reqs] = useStore('requests')
   const [range, setRange] = useState(() => presetRange('month'))
   const [from, to] = range
   const S = useMemo(() => periodStats({ orders, wo, wc, products, wset, ws }, from, to), [orders, wo, wc, products, wset, ws, from, to])
@@ -33,9 +35,10 @@ export default function Dashboard() {
     ['Dòng tiền ròng', formatVND(S.cashflow), S.cashflow < 0 ? 'text-red-300' : 'text-white', 'Tiền đã thu − mọi khoản đã chi'],
     ['Đã chi (sổ Thu chi)', formatVND(S.expense), 'text-red-300', `Nhựa ${formatVND(S.filament)} · điện ${formatVND(S.power)} · khác ${formatVND(S.other)}`],
     ['Nhựa còn trong kho', formatVND(S.stockValue), 'text-white', 'Giá trị cuộn chưa dùng – là tài sản, không phải chi phí'],
+    ['Còn phải thu (mọi đơn)', formatVND(orders.reduce((t, o) => t + dueOf(o), 0)), orders.some((o) => dueOf(o) > 0) ? 'text-amber-300' : 'text-white', 'Chi tiết: Bán hàng → Công nợ & thu tiền'],
     ['Số đơn', S.orders, 'text-white', ''], ['Đơn đang xử lý', S.processing, 'text-accent', ''], ['Đã thu tiền', formatVND(S.collected), 'text-white', ''],
   ]
-  const todo = useMemo(() => todoItems({ orders, products, ws, wo, printers, wset }), [orders, products, ws, wo, printers, wset])
+  const todo = useMemo(() => todoItems({ orders, products, ws, wo, printers, wset, rules: rulesOf(st) }), [orders, products, ws, wo, printers, wset, st])
   const mine = [...orders].slice(0, 6)
   return (
     <div className="space-y-8">

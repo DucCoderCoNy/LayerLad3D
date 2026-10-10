@@ -31,11 +31,11 @@ export default function AdminInsights() {
   const [range, setRange] = useState(() => presetRange('month')), [from, to] = range
   const d = useMemo(() => {
     const inR = orders.filter((o) => inRange(dayKey(o.createdAt), from, to)), ok = inR.filter((o) => o.status !== 'cancelled')
-    const prod = new Map(), col = new Map(), cust = new Map(), pay = new Map(), st = new Map()
+    const prod = new Map(), col = new Map(), cust = new Map(), pay = new Map(), st = new Map(), src = new Map()
     for (const o of ok) {
       for (const i of o.items || []) { add(prod, kind(i), i.price * i.qty, i.qty); if (i.color) add(col, i.color, i.qty, 0) }
       add(cust, normPhone(o.customer?.phone) || '—', o.total, 1); cust.get(normPhone(o.customer?.phone) || '—').name = o.customer?.name
-      add(pay, paymentLabel(o.customer?.payment), o.total, 1)
+      add(pay, paymentLabel(o.customer?.payment), o.total, 1); add(src, o.source || 'Website', o.total, 1)
     }
     inR.forEach((o) => add(st, o.status, 1, 0))
     const everBefore = new Set(orders.filter((o) => o.status !== 'cancelled' && dayKey(o.createdAt) < (from || '0000')).map((o) => normPhone(o.customer?.phone)))
@@ -46,7 +46,7 @@ export default function AdminInsights() {
       custCount: custs.length, repeatRate: custs.length ? repeat / custs.length : 0,
       prod: top(prod).map((r) => ({ ...r, sub: `${r.n} sp` })), qty: top(new Map([...prod].map(([k, x]) => [k, { v: x.n }]))),
       col: top(col), cust: top(cust).map((r) => ({ ...r, k: `${r.name || 'Khách'} · ${r.k}`, sub: `${r.n} đơn` })),
-      pay: top(pay).map((r) => ({ ...r, sub: `${r.n} đơn` })), st: top(st, 10),
+      pay: top(pay).map((r) => ({ ...r, sub: `${r.n} đơn` })), src: top(src).map((r) => ({ ...r, sub: `${r.n} đơn` })), st: top(st, 10),
     }
   }, [orders, from, to])
   const stats = [['Số đơn (không hủy)', d.count], ['Giá trị đơn trung bình', formatVND(d.aov)], ['Số khách', d.custCount], ['Khách quay lại', `${Math.round(d.repeatRate * 100)}%`], ['Tỉ lệ hủy', `${Math.round(d.cancelRate * 100)}%`]]
@@ -62,6 +62,7 @@ export default function AdminInsights() {
         <Card title="Sản phẩm theo số lượng bán"><Rank rows={d.qty} fmt={(v) => `${v} sp`} /></Card>
         <Card title="Màu được chọn nhiều nhất"><Rank rows={d.col} fmt={(v) => `${v} sp`} /></Card>
         <Card title="Khách mua nhiều nhất"><Rank rows={d.cust} fmt={formatVND} /></Card>
+        <Card title="Nguồn đơn (Website / Zalo / Facebook…)"><Rank rows={d.src} fmt={formatVND} /></Card>
         <Card title="Cơ cấu thanh toán"><Rank rows={d.pay} fmt={formatVND} /></Card>
         <Card title="Đơn theo trạng thái"><Rank rows={d.st.map((r) => ({ ...r, k: ORDER_STATUS[r.k]?.[0] || r.k }))} fmt={(v) => `${v} đơn`} /></Card>
       </div>

@@ -4,6 +4,7 @@ import { formatVND } from '../data/products.js'
 import { getStore, supa } from '../lib/store.js'
 import { normPhone, useTitle } from '../lib/seo.js'
 import { ShipBox, Steps } from '../components/OrderTracking.jsx'
+import { dueOf, paidOf } from '../lib/receivables.js'
 import { Badge, ORDER_STATUS, PAY_STATUS, payStatusOf, Field, btn, inp } from '../components/ui.jsx'
 
 
@@ -39,6 +40,7 @@ export default function Track() {
           <ul className="space-y-1 text-sm">{o.items.map((i, k) => <li key={k} className="flex justify-between gap-3"><span className="text-zinc-300">{i.name} ({i.color}) × {i.qty}</span><span>{formatVND(i.price * i.qty)}</span></li>)}</ul>
           <div className="flex justify-between border-t border-white/10 pt-3 font-bold text-white"><span>Tổng (ship {o.ship ? formatVND(o.ship) : 'miễn phí'})</span><span className="text-accent">{formatVND(o.total)}</span></div>
           <p className="flex flex-wrap items-center gap-2 text-sm text-zinc-500">Thanh toán: {o.customer.payment === 'bank' ? 'Chuyển khoản' : 'COD'} · <Badge map={PAY_STATUS} v={payStatusOf(o)} /></p>
+          {paidOf(o) > 0 && dueOf(o) > 0 && <p className="text-sm text-zinc-300">Đã thanh toán {formatVND(paidOf(o))} · còn lại <b className="text-accent">{formatVND(dueOf(o))}</b></p>}
           {o.items.some((i) => i.cfg?.estimate) && <p className="rounded-lg bg-amber-500/10 p-3 text-xs text-amber-200">Món in theo yêu cầu có giá ước tính, LayerLab 3D sẽ xác nhận lại sau khi kiểm tra file.</p>}
         </div>)}
     </div>

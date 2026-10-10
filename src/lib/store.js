@@ -19,6 +19,7 @@ const SEED = {
   showcase: [], // thư viện ảnh + đánh giá khách (quản lý trong Admin)
   colors: DEFAULT_COLORS,   // màu nhựa dùng chung (Admin: Quản lý màu)
   printers: [{ id: 'pr-1', name: 'Anycubic Kobra X', model: 'Kobra X', status: 'idle', note: '', active: true }], // máy in (Admin: Máy in)
+  wlog: [],                 // nhật ký in lỗi / phế phẩm của xưởng (Admin: Tổng quan xưởng)
   customers: [],            // ghi chú nội bộ theo khách (id = số điện thoại chuẩn hóa); lịch sử mua tính từ đơn hàng
   orders: [],
   requests: [],

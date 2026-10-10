@@ -17,3 +17,7 @@ export const SHIPPING_PROVIDERS = [
   { id: '', label: '—' }, { id: 'Tự giao', label: 'Tự giao' },
   { id: 'GHN', label: 'GHN', soon: true }, { id: 'GHTK', label: 'GHTK', soon: true }, { id: 'Viettel Post', label: 'Viettel Post' }, { id: 'J&T', label: 'J&T' },
 ]
+
+/** Link ảnh QR chuyển khoản VietQR (cần Internet). Nội dung CK = mã đơn */
+export const qrUrl = (st, amount, memo) =>
+  `https://img.vietqr.io/image/${st.bankId}-${st.bankAccount}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(st.bankHolder)}`

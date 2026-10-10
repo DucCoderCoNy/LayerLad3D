@@ -15,7 +15,7 @@ export const ORDER_STATUS = {
 export const FLOW = ['new', 'confirmed', 'preparing', 'printing', 'finishing', 'shipping', 'done']
 // Trạng thái thanh toán quản lý RIÊNG với trạng thái đơn
 export const PAY_STATUS = {
-  unpaid: ['Chưa thanh toán', 'bg-zinc-500/20 text-zinc-300'], paid: ['Đã thanh toán', 'bg-emerald-500/20 text-emerald-300'], refunded: ['Đã hoàn tiền', 'bg-red-500/20 text-red-300'],
+  unpaid: ['Chưa thanh toán', 'bg-zinc-500/20 text-zinc-300'], partial: ['Đã đặt cọc', 'bg-amber-500/20 text-amber-300'], paid: ['Đã thanh toán', 'bg-emerald-500/20 text-emerald-300'], refunded: ['Đã hoàn tiền', 'bg-red-500/20 text-red-300'],
 }
 export const payStatusOf = (o) => o?.payStatus || (o?.paid ? 'paid' : 'unpaid')
 export const REQ_STATUS = {

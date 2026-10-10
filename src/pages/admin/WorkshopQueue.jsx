@@ -3,6 +3,7 @@ import { useStore } from '../../lib/store.js'
 import { useState } from 'react'
 import { fmtDT, isDone, plan, printerOf, waitList } from '../../lib/workshop.js'
 import { DataTable, btn, btn2, td } from '../../components/ui.jsx'
+import { FinishModal, WasteModal } from './workshopModals.jsx'
 import { Card, Kpi, Tag, useWset } from './wui.jsx'
 
 const hue = (id) => [...id].reduce((a, c) => a + c.charCodeAt(0) * 7, 0) % 360
@@ -29,7 +30,7 @@ function DayBars({ p }) {
 
 /** Lịch in cho 1 máy (Kobra X): thứ tự, giờ dự kiến, cảnh báo trễ hạn */
 export default function WorkshopQueue() {
-  const [allOrders, setWo] = useStore('wo'), [, setStock] = useStore('ws'), [printers] = useStore('printers')
+  const [allOrders, setWo] = useStore('wo'), [printers] = useStore('printers'), [fin, setFin] = useState(null), [waste, setWaste] = useState(null)
   const S = useWset()
   const act = printers.filter((p) => p.active), [pid, setPid] = useState('')
   const cur = act.find((p) => p.id === pid) || act[0]
@@ -42,11 +43,6 @@ export default function WorkshopQueue() {
   const autoSort = () => { const d = (o) => o.due || '9999'; renumber(waitList(orders).sort((a, b) => (b.prio - a.prio) || (d(a) < d(b) ? -1 : d(a) > d(b) ? 1 : 0) || ((a.q || 0) - (b.q || 0)))) }
   const move = (id, d) => { const w = waitList(orders), i = w.findIndex((o) => o.id === id), j = i + d; if (j < 0 || j >= w.length) return; [w[i], w[j]] = [w[j], w[i]]; renumber(w) }
   const start = (id) => { if (run.length && !confirm('Máy đang có đơn "Đang in". Vẫn bắt đầu đơn này?')) return; setWo((c) => c.map((o) => (o.id === id ? { ...o, status: 'Đang in', startedAt: Date.now() } : o))) }
-  const finish = (id) => {
-    const o = orders.find((x) => x.id === id)
-    if (!o.deducted && o.spool && o.g > 0) setStock((c) => c.map((s) => (s.id === o.spool ? { ...s, qty: Math.max(0, s.qty - o.g) } : s)))
-    setWo((c) => c.map((x) => (x.id === id ? { ...x, status: 'Hoàn thành', deducted: x.deducted || (!!x.spool && x.g > 0) } : x)))
-  }
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3"><h1 className="mr-auto font-display text-3xl font-bold text-white">Hàng đợi in{cur ? ` – ${cur.name}` : ''}</h1>
@@ -68,7 +64,7 @@ export default function WorkshopQueue() {
               <td className={td}>{o.g}g<br />{o.h ? `${o.h}h` : <span className="text-amber-400">chưa có giờ</span>}</td>
               <td className={td}>{fmtDT(x.s)}<br /><small className="text-zinc-500">đến {fmtDT(x.e)}</small></td>
               <td className={`${td} ${x.late ? 'text-red-400' : ''}`}>{o.due || '—'}{x.late && <><br />Trễ hạn!</>}</td>
-              <td className={`${td} whitespace-nowrap`}>{x.run ? <button onClick={() => finish(o.id)} className={`${btn} !px-3 !py-1.5`}>Xong</button> : <>
+              <td className={`${td} whitespace-nowrap`}>{x.run ? <><button onClick={() => setFin(o)} className={`${btn} !px-3 !py-1.5`}>Xong</button><button onClick={() => setWaste({ order: o.id, printer: printerOf(o, printers) })} className="ml-2 px-2 text-xs text-red-300 hover:text-red-200" title="Báo in lỗi">In lỗi</button></> : <>
                 <button onClick={() => move(o.id, -1)} className="px-2 text-zinc-400 hover:text-white" title="Lên">↑</button>
                 <button onClick={() => move(o.id, 1)} className="px-2 text-zinc-400 hover:text-white" title="Xuống">↓</button>
                 <button onClick={() => start(o.id)} className={`${btn} !px-3 !py-1.5`}>Bắt đầu in</button></>}</td>
@@ -76,6 +72,8 @@ export default function WorkshopQueue() {
         </DataTable>
         {quoted > 0 && <p className="mt-3 text-sm text-zinc-500">{quoted} đơn đang "Báo giá" chưa vào hàng đợi. Khi khách chốt, đổi sang "Chờ in" hoặc "Đã cọc".</p>}
       </Card>
+      {fin && <FinishModal order={fin} onClose={() => setFin(null)} />}
+      {waste && <WasteModal preset={waste} onClose={() => setWaste(null)} />}
       <Card title="Công suất máy theo ngày">{p.length ? <DayBars p={p} /> : <p className="text-zinc-500">Chưa có gì để xếp lịch.</p>}</Card>
     </div>
   )

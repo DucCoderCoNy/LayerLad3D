@@ -2,3 +2,5 @@ User-agent: *
 Disallow: /admin
 Disallow: /account
 Disallow: /checkout
+Disallow: /gio-hang
+Disallow: /yeu-thich

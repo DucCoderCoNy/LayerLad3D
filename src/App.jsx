@@ -36,6 +36,9 @@ const WorkshopStock = L(() => import('./pages/admin/WorkshopStock.jsx'))
 const WorkshopCash = L(() => import('./pages/admin/WorkshopCash.jsx'))
 const AdminCosting = L(() => import('./pages/admin/AdminCosting.jsx'))
 const AdminInsights = L(() => import('./pages/admin/AdminInsights.jsx'))
+const WorkshopHome = L(() => import('./pages/admin/WorkshopHome.jsx'))
+const WorkshopBoard = L(() => import('./pages/admin/WorkshopBoard.jsx'))
+const AdminReceivables = L(() => import('./pages/admin/AdminReceivables.jsx'))
 const AdminColors = L(() => import('./pages/admin/AdminColors.jsx'))
 const AdminPrinters = L(() => import('./pages/admin/AdminPrinters.jsx'))
 const AdminCalendar = L(() => import('./pages/admin/AdminCalendar.jsx'))
@@ -79,6 +82,9 @@ export default function App() {
           <Route path="workshop" element={<WorkshopOrders />} />
           <Route path="queue" element={<WorkshopQueue />} />
           <Route path="insights" element={<AdminInsights />} />
+          <Route path="workshop-home" element={<WorkshopHome />} />
+          <Route path="workshop-board" element={<WorkshopBoard />} />
+          <Route path="receivables" element={<AdminReceivables />} />
           <Route path="colors" element={<AdminColors />} />
           <Route path="printers" element={<AdminPrinters />} />
           <Route path="calendar" element={<AdminCalendar />} />

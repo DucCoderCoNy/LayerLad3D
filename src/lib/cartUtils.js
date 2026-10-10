@@ -1,4 +1,4 @@
-/** Món làm riêng theo yêu cầu (móc khóa tên, thời khóa biểu, in theo file): cần chuyển khoản 100% trước khi in */
+/** Món làm riêng theo yêu cầu (in theo file; các loại cũ keychain/timetable vẫn được nhận diện cho giỏ hàng đã lưu): cần chuyển khoản 100% trước khi in */
 export const isCustomItem = (i) => String(i.id || '').startsWith('cfg-') || ['keychain', 'timetable', 'custom_print'].includes(i.kind)
 
 /** Còn thiếu bao nhiêu để được miễn phí ship (0 = đã đủ, null = shop không đặt mức miễn phí) */

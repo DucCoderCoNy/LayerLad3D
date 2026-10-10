@@ -5,46 +5,60 @@ import { useStore } from '../../lib/store.js'
 import { num, stockCost, today, uid } from '../../lib/workshop.js'
 import Spool from '../../components/Spool.jsx'
 import { Field, Modal, btn, btn2, inp } from '../../components/ui.jsx'
+import { downloadCSV } from '../../lib/export.js'
 import { Kpi } from './wui.jsx'
 
 const MATS = ['PLA', 'PETG', 'ABS']
 const fmtG = (g) => (g >= 1000 ? `${(g / 1000).toFixed(2).replace(/\.?0+$/, '')} kg` : `${Math.round(g)} g`)
 const capOf = (s) => Math.max(num(s.cap) || 1000, s.qty) // cuộn đầy (mặc định 1kg); không bao giờ nhỏ hơn số đang có
 const isLow = (s) => s.min > 0 && s.qty <= s.min
+const sealed = (s) => s.qty > 0 && s.qty >= (num(s.cap) || 1000) * 0.98 // cuộn nguyên: chưa dùng (≥98% cuộn đầy)
+const NOCOLOR = '(Chưa chọn màu)'
 
 /** Kho nhựa dạng giá để cuộn (mỗi loại nhựa một kệ, cuộn hiện đúng màu + lượng còn lại) và tủ vật tư. */
 export default function WorkshopStock() {
   const [stock, setStock] = useStore('ws'), [, setCash] = useStore('wc'), [colors] = useStore('colors')
-  const [f, setF] = useState(null), [re, setRe] = useState(null), [q, setQ] = useState(''), [mat, setMat] = useState('all'), [onlyLow, setOnlyLow] = useState(false)
+  const [f, setF] = useState(null), [re, setRe] = useState(null), [q, setQ] = useState(''), [mat, setMat] = useState('all'), [onlyLow, setOnlyLow] = useState(false), [brand, setBrand] = useState('all'), [view, setView] = useState('shelf')
   const set = (k, v) => setF((c) => ({ ...c, [k]: v }))
   const hexOf = (name) => colors.find((c) => c.name === name)?.hex
   const spend = (kind, amount, note) => amount > 0 && setCash((c) => [...c, { id: uid('c'), date: today(), type: 'out', cat: kind === 'filament' ? 'Mua nhựa' : 'Vật tư', amount, note }])
 
   const fil = stock.filter((s) => s.kind === 'filament'), sup = stock.filter((s) => s.kind === 'supply')
+  // Danh sách hãng lấy từ chính các cuộn đã nhập (không cần cấu hình riêng)
+  const brands = useMemo(() => [...new Set(fil.map((s) => (s.brand || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [stock])
+  const brandStat = (b) => { const l = fil.filter((s) => (s.brand || '').trim() === b); return { n: l.length, g: l.reduce((t, s) => t + s.qty, 0), low: l.filter(isLow).length } }
   const stats = useMemo(() => ({
-    spools: fil.length, grams: fil.reduce((t, s) => t + s.qty, 0), value: fil.reduce((t, s) => t + (s.qty * s.price) / 1000, 0), low: fil.filter(isLow).length + sup.filter(isLow).length,
+    spools: fil.filter((s) => s.qty > 0).length, sealed: fil.filter(sealed).length, empty: fil.filter((s) => s.qty <= 0).length, grams: fil.reduce((t, s) => t + s.qty, 0), value: fil.reduce((t, s) => t + (s.qty * s.price) / 1000, 0), low: fil.filter(isLow).length + sup.filter(isLow).length,
   }), [stock])
   const order = (s) => colors.findIndex((c) => c.name === s.color)
-  const shown = fil.filter((s) => (!onlyLow || isLow(s)) && (mat === 'all' || (s.material || '') === (mat === 'none' ? '' : mat)) && (!q.trim() || `${s.name} ${s.color} ${s.material}`.toLowerCase().includes(q.trim().toLowerCase())))
+  const shown = fil.filter((s) => (!onlyLow || isLow(s)) && (mat === 'all' || (s.material || '') === (mat === 'none' ? '' : mat)) && (brand === 'all' || (s.brand || '').trim() === (brand === '__none' ? '' : brand)) && (!q.trim() || `${s.name} ${s.brand} ${s.color} ${s.material}`.toLowerCase().includes(q.trim().toLowerCase())))
   const shelves = [...MATS, ''].map((m) => ({ m, items: shown.filter((s) => (s.material || '') === m).sort((a, b) => (order(a) < 0 ? 99 : order(a)) - (order(b) < 0 ? 99 : order(b)) || a.name.localeCompare(b.name)) }))
 
-  const blankFil = (material = 'PLA') => ({ kind: 'filament', name: '', qty: 1000, cap: 1000, unit: 'g', price: 175000, min: 200, material, color: colors.find((c) => c.active)?.name || '', rec: true })
+  const blankFil = (material = 'PLA') => ({ n: 1, kind: 'filament', name: '', qty: 1000, cap: 1000, unit: 'g', price: 175000, min: 200, material, brand: brand !== 'all' && brand !== '__none' ? brand : '', color: colors.find((c) => c.active)?.name || '', rec: true })
   const save = () => {
-    const auto = f.kind === 'filament' ? [f.material, f.color].filter(Boolean).join(' ') : ''
+    const auto = f.kind === 'filament' ? [f.brand, f.material, f.color].map((x) => (x || '').trim()).filter(Boolean).join(' ') : ''
     const v = { kind: f.kind, name: f.name.trim() || auto || '(chưa đặt tên)', qty: num(f.qty), unit: f.kind === 'filament' ? 'g' : f.unit || 'cái', price: num(f.price), min: num(f.min),
-      material: f.kind === 'filament' ? f.material || '' : '', color: f.kind === 'filament' ? f.color || '' : '', cap: f.kind === 'filament' ? num(f.cap) || 1000 : 0 }
+      material: f.kind === 'filament' ? f.material || '' : '', color: f.kind === 'filament' ? f.color || '' : '', cap: f.kind === 'filament' ? num(f.cap) || 1000 : 0, brand: f.kind === 'filament' ? (f.brand || '').trim() : '' }
     if (f.id) setStock((c) => c.map((s) => (s.id === f.id ? { ...s, ...v } : s)))
-    else { const s = { id: uid('s'), ...v }; setStock((c) => [...c, s]); if (f.rec && s.qty > 0) spend(s.kind, Math.round(stockCost(s, s.qty)), s.name) }
+    else { // thêm mới: nhập 1 lần nhiều cuộn giống nhau (mỗi cuộn là một dòng riêng)
+      const n = f.kind === 'filament' ? Math.min(50, Math.max(1, Math.round(num(f.n)))) : 1, made = Array.from({ length: n }, () => ({ id: uid('s'), ...v }))
+      setStock((c) => [...c, ...made]); if (f.rec && v.qty > 0) spend(v.kind, Math.round(stockCost(v, v.qty) * n), n > 1 ? `${v.name} ×${n}` : v.name) }
     setF(null)
   }
   const doRestock = () => {
-    const qn = num(re.qty); if (!qn) return
-    setStock((c) => c.map((x) => (x.id === re.s.id ? { ...x, qty: x.qty + qn } : x)))
-    if (re.rec) spend(re.s.kind, num(re.cost), 'Nhập thêm: ' + re.s.name)
+    if (re.s.kind === 'filament') { // nhập thêm = thêm N cuộn nguyên mới cùng hãng/loại/màu (mỗi cuộn theo dõi riêng gram còn lại)
+      const n = Math.min(50, Math.max(1, Math.round(num(re.n)))), cap = num(re.s.cap) || 1000
+      setStock((c) => [...c, ...Array.from({ length: n }, () => ({ ...re.s, id: uid('s'), qty: cap, cap }))])
+      if (re.rec) spend('filament', num(re.cost), `Nhập ${n} cuộn: ${re.s.name}`)
+    } else {
+      const qn = num(re.qty); if (!qn) return
+      setStock((c) => c.map((x) => (x.id === re.s.id ? { ...x, qty: x.qty + qn } : x)))
+      if (re.rec) spend(re.s.kind, num(re.cost), 'Nhập thêm: ' + re.s.name)
+    }
     setRe(null)
   }
   const del = (s) => confirm(`Xóa "${s.name}" khỏi kho?`) && setStock((c) => c.filter((x) => x.id !== s.id))
-  const openRestock = (s) => { const qty = s.kind === 'filament' ? 1000 : 10; setRe({ s, qty, cost: Math.round(stockCost(s, qty)), rec: true }) }
+  const openRestock = (s) => { if (s.kind === 'filament') { const cap = num(s.cap) || 1000; setRe({ s, n: 1, cost: Math.round(stockCost(s, cap)), rec: true }) } else setRe({ s, qty: 10, cost: Math.round(stockCost(s, 10)), rec: true }) }
 
   const Actions = ({ s }) => (
     <div className="mt-2 flex justify-center gap-1">
@@ -59,12 +73,14 @@ export default function WorkshopStock() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto font-display text-3xl font-bold text-white">Kho nhựa & vật tư</h1>
+        <div className="flex overflow-hidden rounded-lg border border-white/10 text-sm" role="group" aria-label="Chế độ xem">{[['shelf', 'Giá để cuộn'], ['table', 'Bảng tổng hợp']].map(([k, l]) => <button key={k} onClick={() => setView(k)} className={`px-3 py-2 ${view === k ? 'bg-accent font-semibold text-ink-950' : 'text-zinc-300 hover:bg-white/10'}`}>{l}</button>)}</div>
+        <button onClick={() => downloadCSV('kho-nhua.csv', [['Hãng', 'Loại nhựa', 'Màu', 'Tên cuộn', 'Còn lại (g)', 'Cuộn đầy (g)', 'Còn (%)', 'Tình trạng', 'Giá nhập (₫/kg)'], ...fil.map((x) => [x.brand || '', x.material || '', x.color || '', x.name, Math.round(x.qty), capOf(x), Math.round((x.qty / capOf(x)) * 100), x.qty <= 0 ? 'Rỗng' : sealed(x) ? 'Nguyên' : 'Đang dùng', x.price])])} className={btn2}>Xuất CSV</button>
         <button onClick={() => setF(blankFil())} className={`${btn} flex items-center gap-1`}><Plus size={16} />Thêm cuộn nhựa</button>
         <button onClick={() => setF({ kind: 'supply', name: '', qty: 10, unit: 'cái', price: 5000, min: 3, rec: true })} className={`${btn2} flex items-center gap-1`}><Plus size={16} />Thêm vật tư</button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi l="Số cuộn nhựa" v={stats.spools} /><Kpi l="Tổng khối lượng nhựa" v={fmtG(stats.grams)} /><Kpi l="Giá trị nhựa trong kho" v={$(stats.value)} /><Kpi l="Cần nhập thêm" v={stats.low} cls={stats.low ? 'text-amber-400' : ''} />
+        <div className="rounded-xl border border-white/10 bg-ink-800 p-4"><p className="text-sm text-zinc-400">Số cuộn còn trong kho</p><p className="mt-1 font-display text-2xl font-bold text-white">{stats.spools} <span className="text-sm font-normal text-zinc-500">cuộn</span></p><p className="mt-0.5 text-[11px] text-zinc-500">{stats.sealed} nguyên · {stats.spools - stats.sealed} đang dùng{stats.empty > 0 && <span className="text-red-300"> · {stats.empty} cuộn rỗng</span>}</p></div><Kpi l="Tổng khối lượng nhựa" v={fmtG(stats.grams)} /><Kpi l="Giá trị nhựa trong kho" v={$(stats.value)} /><Kpi l="Cần nhập thêm" v={stats.low} cls={stats.low ? 'text-amber-400' : ''} />
       </div>
       {stats.low > 0 && (
         <p className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200"><AlertTriangle size={16} />Cần nhập thêm:
@@ -76,8 +92,43 @@ export default function WorkshopStock() {
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm tên / màu…" aria-label="Tìm trong kho" className={`${inp} ml-auto w-48`} />
       </div>
 
+      {(brands.length > 0 || fil.some((s) => !s.brand)) && fil.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Lọc theo hãng nhựa">
+          <span className="text-xs text-zinc-500">Hãng:</span>
+          {[['all', `Tất cả (${fil.length})`], ...brands.map((b) => { const t = brandStat(b); return [b, `${b} (${t.n})`] }), ...(brands.length && fil.some((s) => !(s.brand || '').trim()) ? [['__none', 'Chưa ghi hãng']] : [])].map(([k, l]) => (
+            <button key={k} onClick={() => setBrand(k)} className={`rounded-full px-3 py-1.5 text-xs ${brand === k ? 'bg-neon/90 font-semibold text-ink-950' : 'bg-white/10 text-zinc-300 hover:bg-white/20'}`}>{l}</button>))}
+        </div>)}
+      {brand !== 'all' && brand !== '__none' && (() => { const t = brandStat(brand); return <p className="rounded-xl bg-ink-800 p-3 text-sm text-zinc-300">Hãng <b className="text-white">{brand}</b>: {t.n} cuộn · còn {fmtG(t.g)}{t.low > 0 && <span className="text-amber-300"> · {t.low} cuộn sắp hết</span>}</p> })()}
+
+      {view === 'table' && (() => {
+        const live = shown.filter((x) => x.qty > 0)
+        const cols = (brand !== 'all' ? [brand === '__none' ? '' : brand] : [...brands, ...(fil.some((x) => !(x.brand || '').trim()) ? [''] : [])])
+        const names = [...colors.filter((c) => c.active || live.some((x) => x.color === c.name)).map((c) => c.name), ...(live.some((x) => !x.color) ? [NOCOLOR] : [])]
+        const cell = (cn, b) => live.filter((x) => (x.color || NOCOLOR) === cn && (x.brand || '').trim() === b)
+        const sum = (l) => ({ n: l.length, g: l.reduce((t, x) => t + x.qty, 0), sealed: l.filter(sealed).length })
+        const colorOf = (n) => colors.find((c) => c.name === n)?.hex
+        const pick = (cn, b) => { setBrand(b ? b : '__none'); setQ(cn === NOCOLOR ? '' : cn); setView('shelf') }
+        return (
+          <div className="overflow-x-auto rounded-2xl border border-white/10 bg-ink-800">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead className="bg-ink-900 text-xs text-zinc-400"><tr><th className="p-3">Màu</th>{cols.map((b) => <th key={b || '_'} className="p-3 text-center">{b || 'Chưa ghi hãng'}</th>)}<th className="p-3 text-center text-white">Tổng</th></tr></thead>
+              <tbody>
+                {names.map((cn) => { const row = sum(live.filter((x) => (x.color || NOCOLOR) === cn)); return (
+                  <tr key={cn} className="border-t border-white/5">
+                    <td className="p-3"><span className="flex items-center gap-2 text-white"><i className="inline-block h-4 w-4 rounded-full border border-white/30" style={{ background: colorOf(cn) || '#4b5563' }} />{cn}</span></td>
+                    {cols.map((b) => { const t = sum(cell(cn, b)); return (
+                      <td key={b || '_'} className="p-2 text-center">{t.n ? <button onClick={() => pick(cn, b)} className="w-full rounded-lg px-2 py-1 hover:bg-white/10"><b className="text-white">{t.n} cuộn</b><span className="block text-[11px] text-zinc-500">{fmtG(t.g)}{t.sealed > 0 && ` · ${t.sealed} nguyên`}</span></button> : <span className="text-zinc-700">—</span>}</td>) })}
+                    <td className="p-3 text-center">{row.n ? <><b className="text-white">{row.n} cuộn</b><span className="block text-[11px] text-zinc-500">{fmtG(row.g)}</span></> : <b className="text-xs text-red-300">HẾT MÀU</b>}</td>
+                  </tr>) })}
+              </tbody>
+              <tfoot className="border-t border-white/10 bg-ink-900"><tr><td className="p-3 font-semibold text-white">Tổng</td>{cols.map((b) => { const t = sum(live.filter((x) => (x.brand || '').trim() === b)); return <td key={b || '_'} className="p-3 text-center"><b className="text-white">{t.n}</b><span className="block text-[11px] text-zinc-500">{fmtG(t.g)}</span></td> })}<td className="p-3 text-center"><b className="text-accent">{live.length} cuộn</b><span className="block text-[11px] text-zinc-500">{fmtG(live.reduce((t, x) => t + x.qty, 0))}</span></td></tr></tfoot>
+            </table>
+            <p className="border-t border-white/5 p-3 text-xs text-zinc-500">Mỗi ô là số cuộn còn (không tính cuộn rỗng) của màu đó theo hãng. Bấm vào ô để xem các cuộn trên giá. "Nguyên" = cuộn chưa dùng.</p>
+          </div>)
+      })()}
+
       {/* Các kệ nhựa: mỗi loại một kệ gỗ, cuộn đặt trên kệ */}
-      {shelves.filter((s) => s.items.length || (mat === 'all' && s.m && !q && !onlyLow)).map(({ m, items }) => (
+      {view === 'shelf' && shelves.filter((s) => s.items.length || (mat === 'all' && s.m && !q && !onlyLow)).map(({ m, items }) => (
         <section key={m || 'none'} aria-label={`Kệ ${m || 'chưa phân loại'}`}>
           <div className="mb-1 flex items-baseline gap-3 px-1"><h2 className="font-display text-lg font-bold text-white">Kệ {m || 'chưa phân loại'}</h2>
             <span className="text-xs text-zinc-500">{items.length} cuộn · {fmtG(items.reduce((t, s) => t + s.qty, 0))}</span></div>
@@ -92,11 +143,12 @@ export default function WorkshopStock() {
                     </div>
                     <div className="mt-1 h-3 w-full bg-gradient-to-b from-[#6b4a2f] to-[#3d2916] shadow-[0_3px_0_#2a1a0c]" aria-hidden />
                     <div className="w-full px-2 pb-3 pt-2 text-center">
+                      {s.brand && <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-neon">{s.brand}</p>}
                       <p className="truncate text-sm font-semibold text-white" title={s.name}>{s.name}</p>
                       <p className="flex items-center justify-center gap-1.5 text-xs text-zinc-400"><i className="inline-block h-2.5 w-2.5 rounded-full border border-white/30" style={{ background: hex || '#4b5563' }} />{s.color || 'Chưa chọn màu'} · {s.material || '—'}</p>
                       <p className="mt-1 text-sm font-bold text-white">{fmtG(s.qty)} <span className="text-xs font-normal text-zinc-500">/ {fmtG(capOf(s))}</span></p>
                       <div className="mx-auto mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full ${s.qty <= 0 ? 'bg-red-500' : isLow(s) ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: `${Math.round(Math.min(1, pct) * 100)}%` }} /></div>
-                      <p className="mt-1 text-[11px] text-zinc-500">{$(s.price)}/kg {tag(s)}</p>
+                      <p className="mt-1 text-[11px] text-zinc-500">{$(s.price)}/kg {tag(s)}{!tag(s) && (sealed(s) ? <b className="rounded bg-emerald-500/15 px-1.5 text-[10px] text-emerald-300">NGUYÊN</b> : <b className="rounded bg-sky-500/15 px-1.5 text-[10px] text-sky-300">ĐANG DÙNG</b>)}</p>
                       <Actions s={s} />
                     </div>
                   </div>)
@@ -106,7 +158,7 @@ export default function WorkshopStock() {
             </div>
           </div>
         </section>))}
-      {fil.length === 0 && <p className="rounded-2xl border border-dashed border-white/15 p-10 text-center text-zinc-500">Chưa có cuộn nhựa nào. Bấm "Thêm cuộn nhựa" để bắt đầu.</p>}
+      {view === 'shelf' && fil.length === 0 && <p className="rounded-2xl border border-dashed border-white/15 p-10 text-center text-zinc-500">Chưa có cuộn nhựa nào. Bấm "Thêm cuộn nhựa" để bắt đầu.</p>}
 
       <section aria-label="Vật tư">
         <h2 className="mb-2 px-1 font-display text-lg font-bold text-white">Tủ vật tư <span className="text-xs font-normal text-zinc-500">(hộp, băng keo, sơn, giấy nhám, nozzle…)</span></h2>
@@ -129,24 +181,29 @@ export default function WorkshopStock() {
           <div className="grid gap-3 sm:grid-cols-2">
             {f.kind === 'filament' && <Field label="Loại nhựa"><select value={f.material || ''} onChange={(e) => set('material', e.target.value)} className={inp}><option value="">— chưa phân loại —</option>{MATS.map((m) => <option key={m}>{m}</option>)}</select></Field>}
             {f.kind === 'filament' && <Field label="Màu (quản lý ở mục Màu nhựa)"><select value={f.color || ''} onChange={(e) => set('color', e.target.value)} className={inp}><option value="">— chưa chọn —</option>{colors.map((c) => <option key={c.id}>{c.name}</option>)}</select></Field>}
-            <div className="sm:col-span-2"><Field label={f.kind === 'filament' ? `Tên / hãng (để trống = "${[f.material, f.color].filter(Boolean).join(' ') || 'PLA Đen'}")` : 'Tên vật tư'}><input value={f.name} onChange={(e) => set('name', e.target.value)} className={inp} placeholder={f.kind === 'filament' ? 'VD: eSUN PLA+ Đen' : 'VD: Hộp carton nhỏ'} /></Field></div>
+            {f.kind === 'filament' && <div className="sm:col-span-2"><Field label="Hãng nhựa (chọn hãng đã dùng hoặc gõ hãng mới)"><input list="brand-list" value={f.brand || ''} onChange={(e) => set('brand', e.target.value)} placeholder="VD: eSUN, Bambu Lab, Polymaker…" maxLength={40} className={inp} /><datalist id="brand-list">{brands.map((b) => <option key={b} value={b} />)}</datalist></Field></div>}
+            <div className="sm:col-span-2"><Field label={f.kind === 'filament' ? `Tên cuộn (để trống = "${[f.brand, f.material, f.color].filter(Boolean).join(' ') || 'eSUN PLA Đen'}")` : 'Tên vật tư'}><input value={f.name} onChange={(e) => set('name', e.target.value)} className={inp} placeholder={f.kind === 'filament' ? 'VD: PLA+ lô tháng 10' : 'VD: Hộp carton nhỏ'} /></Field></div>
             <Field label={f.kind === 'filament' ? 'Khối lượng còn lại (g)' : 'Số lượng còn'}><input type="number" min="0" value={f.qty} onChange={(e) => set('qty', e.target.value)} className={inp} /></Field>
             {f.kind === 'filament' ? <Field label="Khối lượng cuộn khi đầy (g)"><input type="number" min="100" value={f.cap} onChange={(e) => set('cap', e.target.value)} className={inp} /></Field>
               : <Field label="Đơn vị"><input value={f.unit} onChange={(e) => set('unit', e.target.value)} className={inp} /></Field>}
             <Field label={f.kind === 'filament' ? 'Giá nhập (₫ / kg)' : 'Giá nhập (₫ / đơn vị)'}><input type="number" min="0" value={f.price} onChange={(e) => set('price', e.target.value)} className={inp} /></Field>
             <Field label={f.kind === 'filament' ? 'Cảnh báo khi còn ≤ (g)' : 'Cảnh báo khi còn ≤'}><input type="number" min="0" value={f.min} onChange={(e) => set('min', e.target.value)} className={inp} /></Field>
-            {!f.id && <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={f.rec} onChange={(e) => set('rec', e.target.checked)} className="accent-orange-500" />Ghi khoản chi mua vào Thu chi ({$(Math.round(stockCost({ kind: f.kind, price: num(f.price) }, num(f.qty))))})</label>}
+            {!f.id && f.kind === 'filament' && <Field label="Số cuộn giống nhau cần thêm"><input type="number" min="1" max="50" value={f.n} onChange={(e) => set('n', e.target.value)} className={inp} /></Field>}
+            {!f.id && <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={f.rec} onChange={(e) => set('rec', e.target.checked)} className="accent-orange-500" />Ghi khoản chi mua vào Thu chi ({$(Math.round(stockCost({ kind: f.kind, price: num(f.price) }, num(f.qty)) * (f.kind === 'filament' ? Math.max(1, num(f.n)) : 1)))})</label>}
           </div>
           <div className="mt-4 flex gap-2"><button onClick={save} className={btn}>Lưu</button><button onClick={() => setF(null)} className={btn2}>Đóng</button></div>
         </Modal>)}
 
       {re && (
-        <Modal title={`Nhập thêm: ${re.s.name}`} onClose={() => setRe(null)}>
+        <Modal title={re.s.kind === 'filament' ? `Nhập thêm cuộn: ${re.s.name}` : `Nhập thêm: ${re.s.name}`} onClose={() => setRe(null)}>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label={re.s.kind === 'filament' ? 'Số gram nhập thêm (1 cuộn = 1000)' : `Số ${re.s.unit} nhập thêm`}><input type="number" min="1" value={re.qty} onChange={(e) => setRe({ ...re, qty: e.target.value, cost: Math.round(stockCost(re.s, num(e.target.value))) })} className={inp} /></Field>
+            {re.s.kind === 'filament' ? (
+              <Field label="Số cuộn nhập thêm (mỗi cuộn = cuộn đầy)"><input type="number" min="1" max="50" value={re.n} onChange={(e) => setRe({ ...re, n: e.target.value, cost: Math.round(stockCost(re.s, (num(re.s.cap) || 1000) * Math.max(1, num(e.target.value)))) })} className={inp} /></Field>
+            ) : (
+              <Field label={`Số ${re.s.unit} nhập thêm`}><input type="number" min="1" value={re.qty} onChange={(e) => setRe({ ...re, qty: e.target.value, cost: Math.round(stockCost(re.s, num(e.target.value))) })} className={inp} /></Field>)}
             <Field label="Số tiền đã chi (₫)"><input type="number" min="0" value={re.cost} onChange={(e) => setRe({ ...re, cost: e.target.value })} className={inp} /></Field>
             <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={re.rec} onChange={(e) => setRe({ ...re, rec: e.target.checked })} className="accent-orange-500" />Ghi khoản chi vào Thu chi</label>
-            <p className="text-sm text-zinc-400 sm:col-span-2">Sau khi nhập: <b className="text-white">{re.s.kind === 'filament' ? fmtG(re.s.qty + num(re.qty)) : `${re.s.qty + num(re.qty)} ${re.s.unit}`}</b></p>
+            <p className="text-sm text-zinc-400 sm:col-span-2">{re.s.kind === 'filament' ? <>Sẽ thêm <b className="text-white">{Math.max(1, Math.round(num(re.n)))} cuộn nguyên</b> {[re.s.brand, re.s.material, re.s.color].filter(Boolean).join(' ')} vào kho (cuộn hiện tại giữ nguyên).</> : <>Sau khi nhập: <b className="text-white">{re.s.qty + num(re.qty)} {re.s.unit}</b></>}</p>
           </div>
           <div className="mt-4 flex gap-2"><button onClick={doRestock} className={btn}>Nhập kho</button><button onClick={() => setRe(null)} className={btn2}>Đóng</button></div>
         </Modal>)}

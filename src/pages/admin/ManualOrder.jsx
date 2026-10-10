@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { formatVND } from '../../data/products.js'
 import { useStore } from '../../lib/store.js'
-import { FLOW, ORDER_STATUS, PAY_STATUS, Field, Modal, btn, btn2, inp } from '../../components/ui.jsx'
+import { FLOW, ORDER_STATUS, Field, Modal, btn, btn2, inp } from '../../components/ui.jsx'
+import { PAY_METHODS, payState } from '../../lib/receivables.js'
 
 const SOURCES = ['Zalo', 'Facebook/Messenger', 'Shopee', 'Trực tiếp', 'Khách quen', 'Khác']
 const blank = () => ({ id: '', name: '', color: '', qty: 1, price: 0 })
@@ -10,12 +11,12 @@ const blank = () => ({ id: '', name: '', color: '', qty: 1, price: 0 })
 /** Tạo đơn thay khách (khách nhắn Zalo/Facebook, mua trực tiếp…). Đơn vào cùng danh sách đơn hàng; sản phẩm chọn từ kho sẽ tự trừ tồn. */
 export default function ManualOrder({ onClose, onCreate }) {
   const [products] = useStore('products'), [colors] = useStore('colors'), [st] = useStore('settings')
-  const [f, setF] = useState({ name: '', phone: '', address: '', source: SOURCES[0], payment: 'cod', payStatus: 'unpaid', status: 'confirmed', ship: 0, note: '' })
+  const [f, setF] = useState({ name: '', phone: '', address: '', source: SOURCES[0], payment: 'cod', status: 'confirmed', ship: 0, discount: 0, paidNow: '', pmethod: 'cash', note: '' })
   const [rows, setRows] = useState([blank()]), [err, setErr] = useState('')
   const set = (k, v) => setF((c) => ({ ...c, [k]: v }))
   const upd = (i, d) => setRows((c) => c.map((r, k) => (k === i ? { ...r, ...d } : r)))
   const active = useMemo(() => products.filter((p) => p.active), [products])
-  const subtotal = rows.reduce((s, r) => s + (+r.price || 0) * (+r.qty || 0), 0), total = subtotal + (+f.ship || 0)
+  const subtotal = rows.reduce((s, r) => s + (+r.price || 0) * (+r.qty || 0), 0), total = Math.max(0, subtotal + (+f.ship || 0) - (+f.discount || 0))
 
   const pickProduct = (i, id) => { const p = products.find((x) => x.id === id); upd(i, p ? { id: p.id, name: p.name, price: p.price } : { id: '', name: '', price: 0 }) }
   const submit = (e) => {
@@ -24,11 +25,12 @@ export default function ManualOrder({ onClose, onCreate }) {
     const items = rows.filter((r) => r.name.trim()).map((r, k) => ({ key: `m${k}`, id: r.id || `manual-${k}`, name: r.name.trim(), color: r.color, qty: Math.max(1, Math.round(+r.qty || 1)), price: Math.max(0, Math.round(+r.price || 0)) }))
     if (!items.length) return setErr('Thêm ít nhất 1 món hàng')
     for (const it of items) { const p = products.find((x) => x.id === it.id); if (p && p.stock < it.qty && !confirm(`"${p.name}" chỉ còn ${p.stock} trong kho, bạn đặt ${it.qty}. Vẫn tạo đơn?`)) return }
-    const sub = items.reduce((s, i) => s + i.price * i.qty, 0), ship = Math.max(0, Math.round(+f.ship || 0)), now = Date.now()
+    const sub = items.reduce((s, i) => s + i.price * i.qty, 0), ship = Math.max(0, Math.round(+f.ship || 0)), disc = Math.max(0, Math.round(+f.discount || 0)), tot = Math.max(0, sub + ship - disc), now = Date.now()
+    const got = Math.max(0, Math.round(+f.paidNow || 0)), ps = payState(tot, got)
     onCreate({
       id: 'DH' + now.toString(36).toUpperCase().slice(-5) + Math.random().toString(36).slice(2, 5).toUpperCase(), userId: null, manual: true, source: f.source,
       customer: { name: f.name.trim(), phone: f.phone.trim(), address: f.address.trim() || 'Nhận tại xưởng', note: f.note.trim(), payment: f.payment, zone: '' },
-      items, subtotal: sub, ship, total: sub + ship, status: f.status, paid: f.payStatus === 'paid', payStatus: f.payStatus, createdAt: now,
+      items, subtotal: sub, ship, discount: disc, total: tot, status: f.status, paid: ps === 'paid', payStatus: ps, paidAmount: got, payments: got > 0 ? [{ t: now, amount: got, method: f.pmethod, note: 'Thu khi tạo đơn' }] : [], createdAt: now,
       history: [{ t: now, text: `Admin tạo đơn thủ công (nguồn: ${f.source})` }],
     })
   }
@@ -58,8 +60,13 @@ export default function ManualOrder({ onClose, onCreate }) {
         <div className="grid gap-3 sm:grid-cols-4">
           <Field label="Phí ship (₫)"><input type="number" min="0" step="1000" value={f.ship} onChange={(e) => set('ship', e.target.value)} className={inp} placeholder={`VD ${st.shipFee || 25000}`} /></Field>
           <Field label="Trạng thái đơn"><select value={f.status} onChange={(e) => set('status', e.target.value)} className={inp}>{FLOW.map((k) => <option key={k} value={k}>{ORDER_STATUS[k][0]}</option>)}</select></Field>
-          <Field label="Thanh toán"><select value={f.payStatus} onChange={(e) => set('payStatus', e.target.value)} className={inp}>{['unpaid', 'paid'].map((k) => <option key={k} value={k}>{PAY_STATUS[k][0]}</option>)}</select></Field>
+          <Field label="Giảm giá (₫)"><input type="number" min="0" step="1000" value={f.discount} onChange={(e) => set('discount', e.target.value)} className={inp} /></Field>
           <div className="self-end text-right text-lg font-bold text-accent">{formatVND(total)}</div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="Khách đã trả (₫) – nhập số cọc nếu có"><input type="number" min="0" step="1000" value={f.paidNow} onChange={(e) => set('paidNow', e.target.value)} className={inp} placeholder="0 = chưa trả" /></Field>
+          <Field label="Hình thức đã trả"><select value={f.pmethod} onChange={(e) => set('pmethod', e.target.value)} className={inp}>{PAY_METHODS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+          <p className="self-end pb-2 text-zinc-400">Còn lại: <b className="text-amber-300">{formatVND(Math.max(0, total - (+f.paidNow || 0)))}</b></p>
         </div>
         <Field label="Ghi chú"><input value={f.note} onChange={(e) => set('note', e.target.value)} className={inp} /></Field>
         {err && <p className="text-red-400">{err}</p>}

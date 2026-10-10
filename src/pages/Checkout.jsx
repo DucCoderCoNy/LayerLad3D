@@ -8,7 +8,7 @@ import { findOrder, placeOrder, useStore } from '../lib/store.js'
 import { Field, btn, inp } from '../components/ui.jsx'
 import { useTitle } from '../lib/seo.js'
 import { ShipBox } from '../components/OrderTracking.jsx'
-import { PAYMENT_METHODS } from '../lib/payments.js'
+import { PAYMENT_METHODS, qrUrl } from '../lib/payments.js'
 
 /** Phí ship: miễn phí khi đơn đạt ngưỡng trong Cài đặt */
 export const shipOf = (st, subtotal, zone) => {
@@ -17,9 +17,7 @@ export const shipOf = (st, subtotal, zone) => {
   return z ? z.fee : st.shipFee
 }
 
-/** Link ảnh QR chuyển khoản VietQR (cần Internet). Nội dung CK = mã đơn */
-export const qrUrl = (st, amount, memo) =>
-  `https://img.vietqr.io/image/${st.bankId}-${st.bankAccount}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(st.bankHolder)}`
+export { qrUrl }
 
 export default function Checkout() {
   useTitle('Thanh toán', 'Hoàn tất đơn hàng LayerLab 3D: COD hoặc chuyển khoản VietQR.', { noindex: true })
@@ -35,8 +33,10 @@ export default function Checkout() {
 
   if (items.length === 0) return <div className="py-32 text-center text-zinc-400">Giỏ hàng trống. <Link to="/shop" className="text-accent">Đến cửa hàng</Link></div>
 
+  const closed = !!st.shopClosed
   const submit = (e) => {
     e.preventDefault()
+    if (closed) return setErr(st.closedMessage || 'Cửa hàng đang tạm ngưng nhận đơn.')
     if (!/^(0|\+84)\d{9}$/.test(f.phone.replace(/\s/g, ''))) return setErr('Số điện thoại không hợp lệ')
     if (f.address.trim().length < 8) return setErr('Vui lòng nhập địa chỉ đầy đủ')
     const id = 'DH' + Date.now().toString(36).toUpperCase().slice(-5) + Math.random().toString(36).slice(2, 5).toUpperCase()
@@ -73,7 +73,8 @@ export default function Checkout() {
           <div className="flex justify-between pt-2 text-lg font-bold text-white"><span>Tổng</span><span className="text-accent">{formatVND(total + ship)}</span></div>
         </div>
         {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
-        <button disabled={busy} className={`${btn} mt-5 w-full`}>{busy ? 'Đang gửi…' : 'Đặt hàng'}</button>
+        {closed && <p className="mt-5 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{st.closedMessage || 'Cửa hàng đang tạm ngưng nhận đơn.'}{st.reopenDate && ` Dự kiến mở lại: ${st.reopenDate.split('-').reverse().join('/')}.`}</p>}
+        <button disabled={busy || closed} className={`${btn} mt-5 w-full disabled:opacity-50`}>{busy ? 'Đang gửi…' : closed ? 'Tạm ngưng nhận đơn' : 'Đặt hàng'}</button>
       </aside>
     </form>
   )

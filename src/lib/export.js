@@ -18,6 +18,7 @@ export function printSlips(orders, st) {
       <p class="r">Phí giao hàng: ${o.ship ? vnd(o.ship) : 'Miễn phí'}</p>
       <div class="cod">${cod ? `THU HỘ (COD): <b>${vnd(cod)}</b>` : 'ĐÃ THANH TOÁN – KHÔNG THU TIỀN'}</div>
       ${c.note ? `<p><small>Ghi chú của khách:</small> ${esc(c.note)}</p>` : ''}
+      ${st.slipFooter ? `<p class="foot">${esc(st.slipFooter)}</p>` : ''}
     </section>`
   }).join('')
   w.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Phiếu giao hàng</title><style>
@@ -26,7 +27,7 @@ export function printSlips(orders, st) {
     header{display:flex;justify-content:space-between;gap:12px;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:10px}
     .shop{font-size:16px} .id{text-align:right} .big{font-size:16px} .box{border:1px solid #000;padding:8px;border-radius:6px;margin-bottom:10px}
     table{width:100%;border-collapse:collapse;margin-bottom:6px} th,td{border-bottom:1px solid #999;padding:4px;text-align:left} .r{text-align:right}
-    .cod{border:2px solid #000;padding:8px;text-align:center;font-size:15px;margin:8px 0;border-radius:6px} small{color:#444}
+    .cod{border:2px solid #000;padding:8px;text-align:center;font-size:15px;margin:8px 0;border-radius:6px} small{color:#444} .foot{text-align:center;margin-top:10px;font-style:italic;color:#333}
   </style></head><body>${slips}<script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>`)
   w.document.close()
 }

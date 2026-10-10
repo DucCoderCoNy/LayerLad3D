@@ -1,6 +1,7 @@
 // Số liệu doanh thu / chi phí / lợi nhuận theo khoảng thời gian (dùng cho Tổng quan & Báo cáo)
 import { payStatusOf } from '../components/ui.jsx'
 import { orderCost } from './orderTools.js'
+import { paidOf } from './receivables.js'
 
 export const dayKey = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 export const inRange = (key, from, to) => (!from || key >= from) && (!to || key <= to)
@@ -23,7 +24,7 @@ export function periodStats({ orders, wo, wc, products = [], wset = {}, ws = [] 
   const webCosts = web.map((o) => orderCost(o, products, wset, ws))
   const cogs = sum(shop, (o) => o.cost || 0) + sum(webCosts, (c) => c?.cost || 0)
   const noCost = web.filter((_, i) => !webCosts[i]).length + shop.filter((o) => !(o.cost > 0)).length
-  const collected = sum(web.filter((o) => payStatusOf(o) === 'paid'), (o) => o.total) + sum(shop, (o) => o.paid || 0)
+  const collected = sum(web, (o) => paidOf(o)) + sum(shop, (o) => o.paid || 0)
   return {
     revenue, orders: web.length + shop.length, collected, filament, power, other, expense, cogs, noCost,
     profit: revenue - cogs - other, cashflow: collected - expense,

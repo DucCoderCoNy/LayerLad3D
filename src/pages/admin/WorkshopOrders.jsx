@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Copy, MessageCircle, Plus, Trash2 } from 'lucide-react'
 import { formatVND as $ } from '../../data/products.js'
+import { copyText } from '../../lib/clipboard.js'
 import { useStore } from '../../lib/store.js'
 import { downloadCSV } from '../../lib/export.js'
 import { zaloLink } from '../../lib/orderTools.js'
 import { BLANK, PKG, SRC, ST, calc, stStyle, fmtDT, isDone, num, owed, planAll, printerOf, today, uid } from '../../lib/workshop.js'
 import { dueState, printJobSheet, quoteText } from '../../lib/workshopTools.js'
+import { logMoves, stockMove } from '../../lib/warehouse.js'
 import { DataTable, Field, Modal, btn, btn2, inp, td } from '../../components/ui.jsx'
 import { Kpi, Tag, useWset } from './wui.jsx'
 import { FinishModal, WasteModal } from './workshopModals.jsx'
@@ -64,7 +66,7 @@ export default function WorkshopOrders() {
   }
   const clone = (o) => { const n = { ...o, id: uid('wo'), date: today(), status: 'Báo giá', paid: 0, deducted: false, startedAt: 0, q: Date.now(), history: [{ t: Date.now(), text: `Nhân bản từ đơn ngày ${o.date}` }], chk: {}, note: o.note }; ['gReal', 'hReal', 'finishedAt', 'wasteG', 'wasteN'].forEach((k) => delete n[k]); setWo((x) => [n, ...x]); setDetail(null); setMsg(`Đã nhân bản đơn "${o.name}" thành đơn Báo giá mới ở đầu danh sách.`) }
   const del = (o) => confirm('Xoá đơn này? Các khoản thu chi đã ghi vẫn được giữ lại.') && (setWo((x) => x.filter((y) => y.id !== o.id)), setDetail(null), setPick((p) => p.filter((i) => i !== o.id)))
-  const copy = (t, ok) => navigator.clipboard?.writeText(t).then(() => setMsg(ok), () => setMsg('Không copy được, hãy thử lại.'))
+  const copy = (t, ok) => copyText(t).then((done) => setMsg(done ? ok : 'Không copy được. Hãy bôi đen nội dung và copy thủ công.'))
 
   const open = (o) => { setDetail(null); setTouched(!!o); setF(o ? { ...o } : { ...BLANK, id: '' }) }
   const save = () => {
@@ -75,7 +77,7 @@ export default function WorkshopOrders() {
     else if (ex.status !== o.status) o.history = hist(ex, `Trạng thái: ${ex.status} → ${o.status}`)
     if (o.status === 'Đang in') { if (!o.startedAt) o.startedAt = Date.now() } else if (!isDone(o)) o.startedAt = 0
     cash(o, o.paid - prev)
-    if (isDone(o) && !o.deducted && o.spool && o.g > 0) { setStock((x) => x.map((s) => (s.id === o.spool ? { ...s, qty: Math.max(0, s.qty - o.g) } : s))); o.deducted = true }
+    if (isDone(o) && !o.deducted && o.spool && o.g > 0) { const sp = stock.find((s) => s.id === o.spool); setStock((x) => x.map((s) => (s.id === o.spool ? { ...s, qty: Math.max(0, s.qty - o.g) } : s))); if (sp) logMoves([stockMove(sp, -Math.min(sp.qty, o.g), 'Xuất cho đơn xưởng', Math.max(0, sp.qty - o.g), { ref: o.id, note: `${o.cust} · ${o.name}` })]); o.deducted = true }
     setWo((x) => (ex ? x.map((y) => (y.id === o.id ? o : y)) : [o, ...x])); setF(null)
   }
 

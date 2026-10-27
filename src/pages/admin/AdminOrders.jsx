@@ -9,6 +9,8 @@ import { deductForOrder, restoreForOrder, usageOf } from '../../lib/filament.js'
 import { dayKey, inRange } from '../../lib/finance.js'
 import ManualOrder from './ManualOrder.jsx'
 import { safeUrl } from '../../components/OrderTracking.jsx'
+import { copyText } from '../../lib/clipboard.js'
+import { logMoves, prodMove } from '../../lib/warehouse.js'
 import { PAY_METHODS, addPayment, dueOf, methodLabel, paidOf, resync } from '../../lib/receivables.js'
 import { needsPriceConfirm, orderCost, templates, zaloLink } from '../../lib/orderTools.js'
 import { SHIPPING_PROVIDERS } from '../../lib/payments.js'
@@ -24,6 +26,7 @@ export default function AdminOrders() {
   const o = orders.find((x) => x.id === sel)
   const createManual = (n) => { // trừ tồn kho cho sản phẩm chọn từ kho, rồi thêm đơn vào đầu danh sách
     setProducts((c) => c.map((p) => { const q = n.items.filter((i) => i.id === p.id).reduce((t, i) => t + i.qty, 0); return q ? { ...p, stock: Math.max(0, p.stock - q) } : p }))
+    logMoves(products.filter((p) => n.items.some((i) => i.id === p.id)).map((p) => { const q = n.items.filter((i) => i.id === p.id).reduce((t, i) => t + i.qty, 0); return prodMove(p, -q, 'Xuất cho đơn web', Math.max(0, p.stock - q), { ref: n.id, note: `Đơn thủ công · ${n.customer.name}` }) }))
     setOrders((c) => [n, ...c]); setManual(false); setSel(n.id); setMsg('Đã tạo đơn. Khách tra cứu được bằng mã đơn + số điện thoại.')
   }
   const patch = (id, d) => setOrders((c) => c.map((x) => (x.id === id ? { ...x, ...d } : x)))
@@ -35,8 +38,8 @@ export default function AdminOrders() {
    *  - Hủy: cộng lại tồn kho; khôi phục: trừ lại.  - Hoàn thành: tự trừ nhựa trong kho (1 lần).  - Rời khỏi Hoàn thành/Hủy: hoàn lại nhựa đã trừ. */
   const setStatus = (o, status) => {
     const d = { status, history: hist(o, `Trạng thái: ${ORDER_STATUS[o.status]?.[0]} → ${ORDER_STATUS[status]?.[0]}`) }
-    if (status === 'cancelled' && !o.restocked) { setProducts((c) => c.map((p) => (qtyOf(o, p.id) ? { ...p, stock: p.stock + qtyOf(o, p.id) } : p))); d.restocked = true }
-    if (status !== 'cancelled' && o.restocked) { setProducts((c) => c.map((p) => (qtyOf(o, p.id) ? { ...p, stock: Math.max(0, p.stock - qtyOf(o, p.id)) } : p))); d.restocked = false }
+    if (status === 'cancelled' && !o.restocked) { setProducts((c) => c.map((p) => (qtyOf(o, p.id) ? { ...p, stock: p.stock + qtyOf(o, p.id) } : p))); logMoves(products.filter((p) => qtyOf(o, p.id)).map((p) => prodMove(p, qtyOf(o, p.id), 'Hoàn lại', p.stock + qtyOf(o, p.id), { ref: o.id, note: 'Hủy đơn web' }))); d.restocked = true }
+    if (status !== 'cancelled' && o.restocked) { setProducts((c) => c.map((p) => (qtyOf(o, p.id) ? { ...p, stock: Math.max(0, p.stock - qtyOf(o, p.id)) } : p))); logMoves(products.filter((p) => qtyOf(o, p.id)).map((p) => prodMove(p, -qtyOf(o, p.id), 'Xuất cho đơn web', Math.max(0, p.stock - qtyOf(o, p.id)), { ref: o.id, note: 'Khôi phục đơn web đã hủy' }))); d.restocked = false }
     if (o.deducted && status !== 'done') { restoreForOrder(o); d.deducted = false; d.deductLog = [] }
     if (status === 'done' && !o.deducted) {
       const r = deductForOrder(o); d.deducted = r.log.length > 0; d.deductLog = r.log
@@ -62,7 +65,7 @@ export default function AdminOrders() {
     const total = Math.max(0, subtotal + (o.ship || 0) - (o.discount || 0))
     patch(o.id, { items, subtotal, total, ...resync(o, total), history: hist(o, `Chốt giá "${o.items[idx].name}": ${formatVND(o.items[idx].price)} → ${formatVND(v)} / sp`) })
   }
-  const copy = (t) => navigator.clipboard?.writeText(t).then(() => setMsg('Đã copy tin nhắn – dán vào Zalo/Messenger.'), () => setMsg('Không copy được, hãy bôi đen và copy thủ công.'))
+  const copy = (t) => copyText(t).then((ok) => setMsg(ok ? 'Đã copy tin nhắn – dán vào Zalo/Messenger.' : 'Không copy được. Hãy bôi đen nội dung và copy thủ công.'))
   const bulkSet = () => { if (!bulk || !pick.length || !confirm(`Đổi ${pick.length} đơn sang "${ORDER_STATUS[bulk][0]}"?`)) return; orders.filter((x) => pick.includes(x.id) && x.status !== bulk).forEach((x) => setStatus(x, bulk)); setPick([]); setBulk('') }
 
   const shown = useMemo(() => orders.filter((x) => (!filter || x.status === filter) && (!payF || payStatusOf(x) === payF) && (!need || needsPriceConfirm(x)) && inRange(dayKey(x.createdAt), range[0], range[1])
@@ -131,7 +134,7 @@ export default function AdminOrders() {
             </div>
             <PayPanel key={o.id + paidOf(o) + (o.discount || 0) + o.total} o={o} onPay={(p) => pay(o, p)} onDiscount={(v, n) => discount(o, v, n)} />
             <ShipForm key={o.id + (o.shippedAt || '')} o={o} onSave={(d) => { patch(o.id, { ...d, shippedAt: Date.now(), history: hist(o, `Vận chuyển: ${d.shipProvider || '—'} · mã ${d.trackingCode || '—'}`) }); setMsg('Đã lưu thông tin vận chuyển – khách thấy ngay trong Tài khoản và Tra cứu đơn.') }} />
-            {(() => { const c = orderCost(o, products, wset, stock); return c && <p className="rounded-lg bg-ink-900 p-3 text-xs text-zinc-400">Giá vốn ước tính (nhựa + máy + đóng gói){c.partial ? ', chỉ phần món có khai báo gram' : ''}: <b className="text-zinc-200">{formatVND(c.cost)}</b> · Lãi gộp ước tính (chưa tính ship): <b className={c.profit < 0 ? 'text-red-400' : 'text-emerald-400'}>{formatVND(c.profit)}</b>{c.profit < 0 && ' – đơn đang lỗ!'}</p> })()}
+            {(() => { const c = orderCost(o, products, wset, stock); return c && <p className="rounded-lg bg-ink-900 p-3 text-xs text-zinc-400">Giá vốn ước tính (nhựa + máy + đóng gói){c.partial ? ', chỉ phần món có khai báo gram' : ''}: <b className="text-zinc-200">{formatVND(c.cost)}</b> · Lãi gộp ước tính (chưa tính ship): <b className={c.profit < 0 ? 'text-red-400' : 'text-emerald-400'}>{formatVND(c.profit)}</b>{c.profit < 0 && ' – đơn đang lỗ!'}{o.shipCost > 0 && <> · Ship: khách trả {formatVND(o.ship || 0)}, thực trả {formatVND(o.shipCost)} (<b className={o.shipCost > (o.ship || 0) ? 'text-red-400' : 'text-emerald-400'}>{o.shipCost > (o.ship || 0) ? 'lỗ' : 'dư'} {formatVND(Math.abs(o.shipCost - (o.ship || 0)))}</b>)</>}</p> })()}
             <details className="rounded-lg bg-ink-900 p-3">
               <summary className="cursor-pointer text-zinc-300">Tin nhắn mẫu gửi khách</summary>
               <div className="mt-3 space-y-3">{templates(o, st).map((t) => (
@@ -154,12 +157,12 @@ export default function AdminOrders() {
 
 /** Nhập thông tin vận chuyển để khách theo dõi: đơn vị, mã vận đơn, link tra cứu của đơn vị vận chuyển, ghi chú hiển thị cho khách */
 function ShipForm({ o, onSave }) {
-  const [f, setF] = useState({ shipProvider: o.shipProvider || '', trackingCode: o.trackingCode || '', trackingUrl: o.trackingUrl || '', shipNote: o.shipNote || '' })
+  const [f, setF] = useState({ shipProvider: o.shipProvider || '', trackingCode: o.trackingCode || '', trackingUrl: o.trackingUrl || '', shipNote: o.shipNote || '', shipCost: o.shipCost ?? '' })
   const [err, setErr] = useState(''), set = (k, v) => setF((c) => ({ ...c, [k]: v }))
   const save = () => {
     const url = f.trackingUrl.trim()
     if (url && !safeUrl(url)) return setErr('Link theo dõi phải bắt đầu bằng http:// hoặc https://')
-    setErr(''); onSave({ shipProvider: f.shipProvider, trackingCode: f.trackingCode.trim(), trackingUrl: url ? safeUrl(url) : '', shipNote: f.shipNote.trim().slice(0, 300) })
+    setErr(''); onSave({ shipCost: f.shipCost === '' ? 0 : Math.max(0, Math.round(+f.shipCost || 0)), shipProvider: f.shipProvider, trackingCode: f.trackingCode.trim(), trackingUrl: url ? safeUrl(url) : '', shipNote: f.shipNote.trim().slice(0, 300) })
   }
   return (
     <fieldset className="space-y-3 rounded-xl border border-white/10 p-3">
@@ -167,6 +170,7 @@ function ShipForm({ o, onSave }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-zinc-400">Đơn vị vận chuyển<select value={f.shipProvider} onChange={(e) => set('shipProvider', e.target.value)} className={`${inp} mt-1`}>{SHIPPING_PROVIDERS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}</select></label>
         <label className="text-zinc-400">Mã vận đơn<input value={f.trackingCode} onChange={(e) => set('trackingCode', e.target.value)} className={`${inp} mt-1`} /></label>
+        <label className="text-zinc-400 sm:col-span-2">Phí ship thực trả cho đơn vị vận chuyển (₫) – chỉ để tính lãi, khách không thấy<input type="number" min="0" step="1000" value={f.shipCost} onChange={(e) => set('shipCost', e.target.value)} className={`${inp} mt-1`} placeholder={`Khách trả ${formatVND(o.ship || 0)}`} /></label>
         <label className="text-zinc-400 sm:col-span-2">Link theo dõi đơn của đơn vị vận chuyển (dán link họ gửi cho bạn)<input value={f.trackingUrl} onChange={(e) => set('trackingUrl', e.target.value)} placeholder="https://…" className={`${inp} mt-1`} /></label>
         <label className="text-zinc-400 sm:col-span-2">Ghi chú cho khách (tùy chọn)<input value={f.shipNote} maxLength={300} onChange={(e) => set('shipNote', e.target.value)} placeholder="VD: Đã bàn giao cho GHN lúc 15:00, dự kiến giao 2–3 ngày" className={`${inp} mt-1`} /></label>
       </div>

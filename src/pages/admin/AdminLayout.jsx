@@ -11,7 +11,8 @@ const MENU = [
   { label: 'Bán hàng', icon: ClipboardList, items: [['/admin/orders', 'Đơn hàng', ClipboardList], ['/admin/receivables', 'Công nợ & thu tiền', Wallet], ['/admin/customers', 'Khách hàng', Contact], ['/admin/insights', 'Phân tích bán hàng', BarChart3], ['/admin/requests', 'Yêu cầu báo giá', FileUp]] },
   { label: 'Sản phẩm', icon: Boxes, items: [['/admin/products', 'Sản phẩm', Boxes], ['/admin/categories', 'Danh mục', Tags], ['/admin/colors', 'Màu nhựa', Palette]] },
   { label: 'Xưởng in', icon: Printer, items: [['/admin/workshop-home', 'Tổng quan xưởng', LayoutDashboard], ['/admin/workshop-board', 'Bảng công việc', ClipboardList], ['/admin/workshop', 'Đơn xưởng', Printer], ['/admin/printers', 'Máy in', Printer], ['/admin/queue', 'Hàng đợi in', CalendarClock], ['/admin/calendar', 'Lịch in', CalendarDays]] },
-  { label: 'Kho & tài chính', icon: Wallet, items: [['/admin/stock', 'Kho nhựa & vật tư', Package], ['/admin/cash', 'Thu chi', Wallet], ['/admin/report', 'Báo cáo tháng', BarChart3], ['/admin/costing', 'Giá vốn & sao lưu', Calculator]] },
+  { label: 'Tài chính', icon: Wallet, items: [['/admin/finance', 'Tổng quan tài chính', BarChart3], ['/admin/cash', 'Thu chi', Wallet], ['/admin/report', 'Báo cáo tháng', BarChart3], ['/admin/costing', 'Giá vốn & sao lưu', Calculator]] },
+  { label: 'Kho', icon: Package, items: [['/admin/warehouse', 'Tổng quan kho', Package], ['/admin/stock', 'Kho nhựa & vật tư', Boxes], ['/admin/stocktake', 'Kiểm kho', ClipboardList], ['/admin/warehouse-log', 'Lịch sử xuất nhập', CalendarClock]] },
   { label: 'Nội dung', icon: Newspaper, items: [['/admin/posts', 'Bài viết', Newspaper], ['/admin/showcase', 'Thư viện & đánh giá', Images]] },
   { label: 'Hệ thống', icon: Settings, items: [['/admin/users', 'Người dùng', Users], ['/admin/settings', 'Cài đặt', Settings]] },
 ]

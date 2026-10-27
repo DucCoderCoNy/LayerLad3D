@@ -23,6 +23,38 @@ export async function uploadImage(file, folder = 'misc') {
   if (!supa) return toDataUrl(blob)
   const path = `${folder}/${uid('img')}.jpg`
   const { error } = await supa.storage.from('public-images').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' })
-  if (error) throw new Error('Tải ảnh lên thất bại: ' + error.message)
+  if (error) throw new Error(explainStorageError(error))
   return supa.storage.from('public-images').getPublicUrl(path).data.publicUrl
+}
+
+/** Dịch lỗi Supabase Storage sang hướng dẫn tiếng Việt (kèm lỗi gốc trong ngoặc để tra cứu) */
+export function explainStorageError(err) {
+  const m = String(err?.message || err || ''), raw = ` (lỗi gốc: ${m})`
+  if (/bucket not found/i.test(m)) return 'Chưa có kho ảnh "public-images" trên Supabase. Mở SQL Editor, chạy file supabase/migrations/004_fix_image_storage.sql rồi thử lại.' + raw
+  if (/row-level security|violates|permission|not authori[sz]ed|unauthori[sz]ed|forbidden/i.test(m)) return 'Không có quyền tải ảnh: tài khoản cần vai trò admin (bảng profiles) và kho ảnh cần có chính sách cho admin. Chạy 004_fix_image_storage.sql và kiểm tra cột role = admin.' + raw
+  if (/jwt|token|expired|not authenticated|invalid claim/i.test(m)) return 'Phiên đăng nhập đã hết hạn. Hãy đăng xuất rồi đăng nhập lại.' + raw
+  if (/exceed|too large|payload|maximum allowed|entity too large/i.test(m)) return 'Ảnh vượt giới hạn dung lượng của kho ảnh. Thử ảnh nhỏ hơn hoặc nâng giới hạn bằng 004_fix_image_storage.sql.' + raw
+  if (/mime|not supported|invalid.*type/i.test(m)) return 'Kho ảnh không chấp nhận định dạng này. Chỉ dùng JPG, PNG hoặc WebP.' + raw
+  if (/failed to fetch|networkerror|network|load failed|cors/i.test(m)) return 'Không kết nối được tới Supabase. Kiểm tra mạng và biến môi trường VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY ở nơi deploy (Vercel/Netlify) rồi deploy lại.' + raw
+  return 'Tải ảnh lên thất bại.' + raw
+}
+
+/** Chẩn đoán kho ảnh từng bước (dùng ở Cài đặt → Tài khoản & dữ liệu). Trả về [{ ok, label, detail }] */
+export async function checkImageStorage() {
+  const out = [], add = (ok, label, detail = '') => { out.push({ ok, label, detail }); return ok }
+  if (!add(!!supa, 'Kết nối Supabase', supa ? '' : 'Web đang chạy chế độ 1 máy (chưa có VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY khi build). Đặt biến môi trường ở Vercel/Netlify rồi deploy lại.')) return out
+  const { data: sess } = await supa.auth.getSession()
+  if (!add(!!sess?.session, 'Đã đăng nhập', sess?.session ? sess.session.user.email : 'Chưa có phiên đăng nhập. Đăng nhập lại.')) return out
+  const { data: prof, error: pe } = await supa.from('profiles').select('role,banned').eq('id', sess.session.user.id).maybeSingle()
+  add(prof?.role === 'admin' && !prof?.banned, 'Vai trò admin trong bảng profiles', pe ? `Không đọc được hồ sơ: ${pe.message}` : prof ? `role = ${prof.role}${prof.banned ? ' (đang bị khóa)' : ''}` : 'Chưa có dòng hồ sơ. Chạy schema.sql rồi đặt role = admin cho tài khoản này.')
+  // Tải thử một ảnh nhỏ rồi xóa
+  const blob = await new Promise((res) => { const c = document.createElement('canvas'); c.width = c.height = 8; c.getContext('2d').fillRect(0, 0, 8, 8); c.toBlob(res, 'image/jpeg', 0.8) })
+  const path = `_check/${uid('chk')}.jpg`, { error } = await supa.storage.from('public-images').upload(path, blob, { contentType: 'image/jpeg' })
+  if (!add(!error, 'Tải thử một ảnh lên kho "public-images"', error ? explainStorageError(error) : '')) return out
+  const url = supa.storage.from('public-images').getPublicUrl(path).data.publicUrl
+  let readable = false; try { readable = (await fetch(url, { method: 'HEAD' })).ok } catch { /* bị chặn mạng */ }
+  add(readable, 'Ảnh vừa tải mở được công khai', readable ? '' : 'Kho ảnh chưa ở chế độ public nên khách sẽ không thấy ảnh. Chạy 004_fix_image_storage.sql.')
+  const { error: de } = await supa.storage.from('public-images').remove([path])
+  add(!de, 'Xóa ảnh thử', de ? explainStorageError(de) : '')
+  return out
 }

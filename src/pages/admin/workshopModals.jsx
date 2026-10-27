@@ -3,6 +3,7 @@ import { formatVND } from '../../data/products.js'
 import { useStore } from '../../lib/store.js'
 import { calc, num, uid } from '../../lib/workshop.js'
 import { WASTE_REASONS } from '../../lib/workshopTools.js'
+import { logMoves, stockMove } from '../../lib/warehouse.js'
 import { Field, Modal, btn, btn2, inp } from '../../components/ui.jsx'
 import { useWset } from './wui.jsx'
 
@@ -13,7 +14,7 @@ export function FinishModal({ order: o, onClose, toStatus = 'Hoàn thành' }) {
   const sp = stock.find((s) => s.id === o.spool && s.kind === 'filament')
   const dG = num(g) - num(o.g), dCost = Math.round(calc({ ...o, g: num(g), h: num(h) }, S, stock).cost - calc(o, S, stock).cost)
   const done = () => {
-    if (!o.deducted && sp && num(g) > 0) setStock((c) => c.map((s) => (s.id === sp.id ? { ...s, qty: Math.max(0, s.qty - num(g)) } : s)))
+    if (!o.deducted && sp && num(g) > 0) { setStock((c) => c.map((s) => (s.id === sp.id ? { ...s, qty: Math.max(0, s.qty - num(g)) } : s))); logMoves([stockMove(sp, -Math.min(sp.qty, num(g)), 'Xuất cho đơn xưởng', Math.max(0, sp.qty - num(g)), { ref: o.id, note: `${o.cust} · ${o.name}` })]) }
     setWo((c) => c.map((x) => (x.id === o.id ? { ...x, status: toStatus, history: [...(x.history || []), { t: Date.now(), text: `Trạng thái: ${x.status} → ${toStatus} (thực tế ${num(g)}g · ${num(h)}h)` }].slice(-60), gReal: num(g), hReal: num(h), cost: Math.max(0, Math.round(num(x.cost) + dCost)), deducted: x.deducted || !!sp, finishedAt: Date.now() } : x)))
     onClose()
   }
@@ -44,7 +45,7 @@ export function WasteModal({ preset = {}, onClose }) {
   const pickOrder = (id) => { const x = wo.find((y) => y.id === id); setF((c) => ({ ...c, order: id, printer: x ? (x.printer || c.printer) : c.printer, spool: '' })) }
   const save = () => {
     if (!(num(f.g) > 0 || num(f.h) > 0)) return
-    if (sp && num(f.g) > 0) setStock((c) => c.map((s) => (s.id === sp.id ? { ...s, qty: Math.max(0, s.qty - num(f.g)) } : s)))
+    if (sp && num(f.g) > 0) { setStock((c) => c.map((s) => (s.id === sp.id ? { ...s, qty: Math.max(0, s.qty - num(f.g)) } : s))); logMoves([stockMove(sp, -Math.min(sp.qty, num(f.g)), 'In lỗi', Math.max(0, sp.qty - num(f.g)), { ref: o?.id || '', note: `${f.reason}${o ? ` · ${o.cust} · ${o.name}` : ''}` })]) }
     if (o) setWo((c) => c.map((x) => (x.id === o.id ? { ...x, cost: Math.round(num(x.cost) + cost), wasteG: num(x.wasteG) + num(f.g), wasteN: num(x.wasteN) + 1 } : x)))
     setLog((c) => [...c, { id: uid('w'), t: Date.now(), printer: f.printer, order: f.order, orderName: o ? `${o.cust} · ${o.name}` : '', spool: sp?.id || '', spoolName: sp?.name || '', g: num(f.g), h: num(f.h), reason: f.reason, note: f.note.trim(), cost }])
     onClose()

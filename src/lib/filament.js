@@ -1,6 +1,7 @@
 // Trừ / hoàn nhựa trong kho (collection `ws`, mục kind='filament') theo đơn hàng web.
 // Mỗi cuộn có thể có material ('PLA'|'PETG'|'ABS') và color (tên màu) để hệ thống tự chọn cuộn phù hợp.
 import { getStore, write } from './store.js'
+import { logMoves, stockMove } from './warehouse.js'
 
 /** Lượng nhựa mỗi đơn cần: món in theo yêu cầu (grams × SL) + sản phẩm có khai báo "nhựa/1 sản phẩm" */
 export function usageOf(order, products = getStore('products')) {
@@ -20,14 +21,14 @@ const fits = (s, u) => s.kind === 'filament' && s.qty > 0 && (!s.material || s.m
 /** Trừ nhựa. Trả về { log:[{spool,name,g}], missing:[tên món không tìm được cuộn phù hợp] }. Chỉ trừ 1 lần cho mỗi đơn (order.deducted). */
 export function deductForOrder(order) {
   if (order.deducted) return { log: order.deductLog || [], missing: [], already: true }
-  const stock = getStore('ws').map((s) => ({ ...s })), log = [], missing = []
+  const stock = getStore('ws').map((s) => ({ ...s })), log = [], missing = [], moves = []
   for (const u of usageOf(order)) {
     let need = u.grams
     const pool = stock.filter((s) => fits(s, u)).sort((a, b) => (a.color === u.color ? 0 : 1) - (b.color === u.color ? 0 : 1) || a.qty - b.qty)
-    for (const s of pool) { if (need <= 0) break; const g = Math.min(s.qty, need); s.qty -= g; need -= g; log.push({ spool: s.id, name: s.name, g: Math.round(g) }) }
+    for (const s of pool) { if (need <= 0) break; const g = Math.min(s.qty, need), before = s.qty; s.qty -= g; need -= g; log.push({ spool: s.id, name: s.name, g: Math.round(g) }); moves.push(stockMove({ ...s, qty: before }, -g, 'Xuất cho đơn web', s.qty, { ref: order.id, note: `${order.customer?.name || ''} · ${u.name}` })) }
     if (need > 0.5) missing.push(`${u.name} (${u.material} ${u.color || ''}: thiếu ${Math.round(need)}g)`)
   }
-  if (log.length) write('ws', stock)
+  if (log.length) { write('ws', stock); logMoves(moves) }
   return { log, missing }
 }
 
@@ -35,5 +36,7 @@ export function deductForOrder(order) {
 export function restoreForOrder(order) {
   if (!order.deducted || !order.deductLog?.length) return
   const back = {}; order.deductLog.forEach((l) => { back[l.spool] = (back[l.spool] || 0) + l.g })
-  write('ws', getStore('ws').map((s) => (back[s.id] ? { ...s, qty: s.qty + back[s.id] } : s)))
+  const cur = getStore('ws')
+  write('ws', cur.map((s) => (back[s.id] ? { ...s, qty: s.qty + back[s.id] } : s)))
+  logMoves(cur.filter((s) => back[s.id]).map((s) => stockMove(s, back[s.id], 'Hoàn lại', s.qty + back[s.id], { ref: order.id, note: 'Đơn đổi khỏi trạng thái hoàn thành / bị hủy' })))
 }

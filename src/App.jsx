@@ -39,6 +39,10 @@ const AdminInsights = L(() => import('./pages/admin/AdminInsights.jsx'))
 const WorkshopHome = L(() => import('./pages/admin/WorkshopHome.jsx'))
 const WorkshopBoard = L(() => import('./pages/admin/WorkshopBoard.jsx'))
 const AdminReceivables = L(() => import('./pages/admin/AdminReceivables.jsx'))
+const AdminFinance = L(() => import('./pages/admin/AdminFinance.jsx'))
+const AdminWarehouse = L(() => import('./pages/admin/AdminWarehouse.jsx'))
+const AdminStocktake = L(() => import('./pages/admin/AdminStocktake.jsx'))
+const WarehouseLog = L(() => import('./pages/admin/WarehouseLog.jsx'))
 const AdminColors = L(() => import('./pages/admin/AdminColors.jsx'))
 const AdminPrinters = L(() => import('./pages/admin/AdminPrinters.jsx'))
 const AdminCalendar = L(() => import('./pages/admin/AdminCalendar.jsx'))
@@ -85,6 +89,10 @@ export default function App() {
           <Route path="workshop-home" element={<WorkshopHome />} />
           <Route path="workshop-board" element={<WorkshopBoard />} />
           <Route path="receivables" element={<AdminReceivables />} />
+          <Route path="finance" element={<AdminFinance />} />
+          <Route path="warehouse" element={<AdminWarehouse />} />
+          <Route path="stocktake" element={<AdminStocktake />} />
+          <Route path="warehouse-log" element={<WarehouseLog />} />
           <Route path="colors" element={<AdminColors />} />
           <Route path="printers" element={<AdminPrinters />} />
           <Route path="calendar" element={<AdminCalendar />} />

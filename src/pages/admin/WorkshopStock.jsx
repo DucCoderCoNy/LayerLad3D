@@ -6,6 +6,7 @@ import { num, stockCost, today, uid } from '../../lib/workshop.js'
 import Spool from '../../components/Spool.jsx'
 import { Field, Modal, btn, btn2, inp } from '../../components/ui.jsx'
 import { downloadCSV } from '../../lib/export.js'
+import { logMoves, stockMove } from '../../lib/warehouse.js'
 import { Kpi } from './wui.jsx'
 
 const MATS = ['PLA', 'PETG', 'ABS']
@@ -39,25 +40,26 @@ export default function WorkshopStock() {
     const auto = f.kind === 'filament' ? [f.brand, f.material, f.color].map((x) => (x || '').trim()).filter(Boolean).join(' ') : ''
     const v = { kind: f.kind, name: f.name.trim() || auto || '(chưa đặt tên)', qty: num(f.qty), unit: f.kind === 'filament' ? 'g' : f.unit || 'cái', price: num(f.price), min: num(f.min),
       material: f.kind === 'filament' ? f.material || '' : '', color: f.kind === 'filament' ? f.color || '' : '', cap: f.kind === 'filament' ? num(f.cap) || 1000 : 0, brand: f.kind === 'filament' ? (f.brand || '').trim() : '' }
-    if (f.id) setStock((c) => c.map((s) => (s.id === f.id ? { ...s, ...v } : s)))
+    if (f.id) { const old = stock.find((s) => s.id === f.id); if (old && old.qty !== v.qty) logMoves([stockMove({ ...old, ...v }, v.qty - old.qty, 'Điều chỉnh', v.qty, { note: 'Sửa số lượng trong kho' })]); setStock((c) => c.map((s) => (s.id === f.id ? { ...s, ...v } : s))) }
     else { // thêm mới: nhập 1 lần nhiều cuộn giống nhau (mỗi cuộn là một dòng riêng)
       const n = f.kind === 'filament' ? Math.min(50, Math.max(1, Math.round(num(f.n)))) : 1, made = Array.from({ length: n }, () => ({ id: uid('s'), ...v }))
-      setStock((c) => [...c, ...made]); if (f.rec && v.qty > 0) spend(v.kind, Math.round(stockCost(v, v.qty) * n), n > 1 ? `${v.name} ×${n}` : v.name) }
+      setStock((c) => [...c, ...made]); logMoves(made.map((s) => stockMove(s, s.qty, 'Nhập kho', s.qty, { note: 'Thêm mới vào kho' }))); if (f.rec && v.qty > 0) spend(v.kind, Math.round(stockCost(v, v.qty) * n), n > 1 ? `${v.name} ×${n}` : v.name) }
     setF(null)
   }
   const doRestock = () => {
     if (re.s.kind === 'filament') { // nhập thêm = thêm N cuộn nguyên mới cùng hãng/loại/màu (mỗi cuộn theo dõi riêng gram còn lại)
       const n = Math.min(50, Math.max(1, Math.round(num(re.n)))), cap = num(re.s.cap) || 1000
-      setStock((c) => [...c, ...Array.from({ length: n }, () => ({ ...re.s, id: uid('s'), qty: cap, cap }))])
+      const made = Array.from({ length: n }, () => ({ ...re.s, id: uid('s'), qty: cap, cap }))
+      setStock((c) => [...c, ...made]); logMoves(made.map((s) => stockMove(s, cap, 'Nhập kho', cap, { note: 'Nhập thêm cuộn nguyên' })))
       if (re.rec) spend('filament', num(re.cost), `Nhập ${n} cuộn: ${re.s.name}`)
     } else {
       const qn = num(re.qty); if (!qn) return
-      setStock((c) => c.map((x) => (x.id === re.s.id ? { ...x, qty: x.qty + qn } : x)))
+      setStock((c) => c.map((x) => (x.id === re.s.id ? { ...x, qty: x.qty + qn } : x))); logMoves([stockMove(re.s, qn, 'Nhập kho', re.s.qty + qn, { note: 'Nhập thêm vật tư' })])
       if (re.rec) spend(re.s.kind, num(re.cost), 'Nhập thêm: ' + re.s.name)
     }
     setRe(null)
   }
-  const del = (s) => confirm(`Xóa "${s.name}" khỏi kho?`) && setStock((c) => c.filter((x) => x.id !== s.id))
+  const del = (s) => { if (!confirm(`Xóa "${s.name}" khỏi kho?`)) return; setStock((c) => c.filter((x) => x.id !== s.id)); if (s.qty > 0) logMoves([stockMove(s, -s.qty, 'Xóa khỏi kho', 0, { note: 'Xóa mục khỏi kho' })]) }
   const openRestock = (s) => { if (s.kind === 'filament') { const cap = num(s.cap) || 1000; setRe({ s, n: 1, cost: Math.round(stockCost(s, cap)), rec: true }) } else setRe({ s, qty: 10, cost: Math.round(stockCost(s, 10)), rec: true }) }
 
   const Actions = ({ s }) => (

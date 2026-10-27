@@ -32,9 +32,9 @@ export function todoItems({ orders, products, ws, wo, printers, wset, rules = RU
   if (noHours.length) add('low', `${noHours.length} đơn xưởng chưa nhập giờ in nên lịch in chưa chính xác`, '/admin/workshop')
 
   const fil = ws.filter((s) => s.kind === 'filament' && s.min > 0 && s.qty <= s.min)
-  if (fil.length) add('mid', `Nhựa sắp hết: ${fil.map((s) => `${s.name} (${Math.round(s.qty)}g)`).join(', ')}`, '/admin/stock')
+  if (fil.length) add('mid', `Nhựa sắp hết: ${fil.map((s) => `${s.name} (${Math.round(s.qty)}g)`).join(', ')}`, '/admin/warehouse')
   const low = products.filter((p) => p.active && p.stock <= rules.lowStock)
-  if (low.length) add('low', `${low.length} sản phẩm sắp hết hàng: ${low.slice(0, 3).map((p) => p.name).join(', ')}${low.length > 3 ? '…' : ''}`, '/admin/products')
+  if (low.length) add('low', `${low.length} sản phẩm sắp hết hàng: ${low.slice(0, 3).map((p) => p.name).join(', ')}${low.length > 3 ? '…' : ''}`, '/admin/warehouse')
   const rank = { high: 0, mid: 1, low: 2 }
   return out.sort((a, b) => rank[a.level] - rank[b.level])
 }

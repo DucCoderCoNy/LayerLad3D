@@ -3,6 +3,7 @@ import { formatVND } from '../../data/products.js'
 import { useStore } from '../../lib/store.js'
 import { dayKey, inRange, presetRange } from '../../lib/finance.js'
 import { normPhone } from '../../lib/seo.js'
+import Rank from '../../components/Rank.jsx'
 import DateRange from '../../components/DateRange.jsx'
 import { ORDER_STATUS } from '../../components/ui.jsx'
 import { paymentLabel } from '../../lib/payments.js'
@@ -10,18 +11,6 @@ import { Card } from './wui.jsx'
 
 const kind = (i) => (i.id === 'cfg-print' ? 'In theo yêu cầu' : i.id === 'cfg-keychain' ? 'Móc khóa tùy biến' : i.id === 'cfg-timetable' ? 'Thời khóa biểu module' : i.name)
 
-/** Danh sách xếp hạng có thanh ngang (chiều rộng theo % của giá trị lớn nhất) */
-function Rank({ rows, fmt, empty = 'Chưa có dữ liệu' }) {
-  const max = Math.max(...rows.map((r) => r.v), 1)
-  if (!rows.length) return <p className="text-sm text-zinc-500">{empty}</p>
-  return (
-    <ol className="space-y-2.5">{rows.map((r, i) => (
-      <li key={r.k} className="text-sm">
-        <div className="flex justify-between gap-3"><span className="truncate text-zinc-200"><b className="mr-2 text-zinc-500">{i + 1}</b>{r.k}</span><span className="shrink-0 text-white">{fmt(r.v)}{r.sub && <small className="ml-2 text-zinc-500">{r.sub}</small>}</span></div>
-        <div className="mt-1 h-1.5 rounded-full bg-white/5"><div className="h-full rounded-full bg-accent" style={{ width: `${Math.max(2, (r.v / max) * 100)}%` }} /></div>
-      </li>))}</ol>
-  )
-}
 const top = (m, n = 8) => [...m].map(([k, x]) => ({ k, ...x })).sort((a, b) => b.v - a.v).slice(0, n)
 const add = (m, k, v, sub) => { const x = m.get(k) || { v: 0, n: 0 }; x.v += v; x.n += sub; m.set(k, x) }
 

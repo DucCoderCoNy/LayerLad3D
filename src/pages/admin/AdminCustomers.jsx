@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { MessageCircle } from 'lucide-react'
+import { copyText } from '../../lib/clipboard.js'
 import { downloadCSV } from '../../lib/export.js'
 import { formatVND } from '../../data/products.js'
 import { useStore } from '../../lib/store.js'
@@ -38,7 +39,7 @@ export default function AdminCustomers() {
     && (filter === 'all' || (filter === 'vip' && tagOf(c) === 'VIP') || (filter === 'regular' && tagOf(c) === 'Khách quen') || (filter === 'lapsed' && c.days >= LAPSED && c.n > 0) || (filter === 'once' && c.n === 1) || (filter === 'due' && c.due > 0)))
   const c = list.find((x) => x.phone === sel)
   const save = () => { setNotes((cur) => (cur.some((n) => n.id === sel) ? cur.map((n) => (n.id === sel ? { ...n, ...draft } : n)) : [...cur, { id: sel, ...draft }])); setSel(null) }
-  const copyWin = (x) => navigator.clipboard?.writeText(winback(x)).then(() => setMsg(`Đã copy tin nhắn chăm sóc cho ${x.name} – dán vào Zalo.`), () => setMsg('Không copy được.'))
+  const copyWin = (x) => copyText(winback(x)).then((ok) => setMsg(ok ? `Đã copy tin nhắn chăm sóc cho ${x.name} – dán vào Zalo.` : 'Không copy được. Hãy bôi đen nội dung và copy thủ công.'))
   const FILTERS = [['all', 'Tất cả'], ['vip', 'VIP'], ['regular', 'Khách quen'], ['lapsed', `Lâu chưa mua (>${LAPSED} ngày)`], ['once', 'Mới mua 1 lần'], ['due', 'Còn nợ']]
 
   return (

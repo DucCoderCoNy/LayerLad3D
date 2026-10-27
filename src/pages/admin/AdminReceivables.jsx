@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { MessageCircle } from 'lucide-react'
 import { formatVND } from '../../data/products.js'
 import { useStore } from '../../lib/store.js'
+import { copyText } from '../../lib/clipboard.js'
 import { downloadCSV } from '../../lib/export.js'
 import { zaloLink } from '../../lib/orderTools.js'
 import { KIND, PAY_METHODS, addPayment, dueOf, methodLabel, paidOf, receivableKind, reminderText } from '../../lib/receivables.js'
@@ -25,7 +26,7 @@ export default function AdminReceivables() {
     setOrders((c) => c.map((o) => (o.id === pay.o.id ? { ...o, ...addPayment(o, pay), history: [...(o.history || []), { t: Date.now(), text: `Thu ${formatVND(amt)} (${methodLabel(pay.method)})${pay.note ? ` – ${pay.note}` : ''}` }].slice(-50) } : o)))
     setPay(null)
   }
-  const remind = (o) => navigator.clipboard?.writeText(reminderText(o, st)).then(() => setMsg(`Đã copy tin nhắn nhắc cho ${o.customer.name} – dán vào Zalo/Messenger.`), () => setMsg('Không copy được, hãy thử lại.'))
+  const remind = (o) => copyText(reminderText(o, st)).then((ok) => setMsg(ok ? `Đã copy tin nhắn nhắc cho ${o.customer.name} – dán vào Zalo/Messenger.` : 'Không copy được. Hãy bôi đen nội dung và copy thủ công.'))
 
   return (
     <div className="space-y-5">

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { BANKS } from '../../data/banks.js'
 import { resetAll, seedRemote, supa, getStore, write, useStore } from '../../lib/store.js'
 import { qrUrl } from '../../lib/payments.js'
+import { checkImageStorage } from '../../lib/upload.js'
 import { RULE_DEFAULTS } from '../../lib/rules.js'
 import { TEMPLATE_DEFS, TEMPLATE_VARS, fillTemplate, templateVars } from '../../lib/orderTools.js'
 import { useAuth } from '../../context/AuthContext.jsx'
@@ -77,6 +78,8 @@ export default function AdminSettings() {
     } catch (x) { setPwMsg(['err', x.message || 'Không đổi được mật khẩu']) }
     setBusy(false)
   }
+  const [chk, setChk] = useState(null)
+  const runCheck = async () => { setChk('run'); try { setChk(await checkImageStorage()) } catch (x) { setChk([{ ok: false, label: 'Kiểm tra bị gián đoạn', detail: x.message }]) } }
   const exportSettings = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ settings: st, wset: getStore('wset') }, null, 1)], { type: 'application/json' })); a.download = `cai-dat-layerlab-${new Date().toISOString().slice(0, 10)}.json`; a.click() }
   const importSettings = (e) => {
     const file = e.target.files?.[0]; e.target.value = ''; if (!file) return
@@ -180,6 +183,11 @@ export default function AdminSettings() {
             {pwMsg && <p className={`text-sm ${pwMsg[0] === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>{pwMsg[1]}</p>}
             <button type="button" disabled={busy} onClick={changePw} className={btn}>{busy ? 'Đang đổi…' : 'Đổi mật khẩu'}</button>
           </Group>
+          {supa && (
+            <Group title="Kiểm tra kho ảnh" hint="Dùng khi không thêm được ảnh sản phẩm / bài viết trên web online. Công cụ tải thử một ảnh nhỏ rồi xóa đi và cho biết lỗi ở bước nào.">
+              <button type="button" onClick={runCheck} disabled={chk === 'run'} className={btn2}>{chk === 'run' ? 'Đang kiểm tra…' : 'Kiểm tra kho ảnh'}</button>
+              {Array.isArray(chk) && <ul className="space-y-2 text-sm">{chk.map((s, i) => <li key={i} className={s.ok ? 'text-emerald-400' : 'text-red-300'}>{s.ok ? '✓' : '✗'} {s.label}{s.detail && <span className="block text-xs text-zinc-400">{s.detail}</span>}</li>)}</ul>}
+            </Group>)}
           <Group title="Sao lưu & khôi phục" hint="Sao lưu toàn bộ dữ liệu (sản phẩm, đơn hàng, kho…) ở trang Giá vốn & sao lưu. Tại đây chỉ xuất/nhập riêng phần cài đặt.">
             <div className="flex flex-wrap gap-2"><button type="button" onClick={exportSettings} className={btn2}>Xuất cài đặt (JSON)</button><label className={`${btn2} cursor-pointer`}>Nhập cài đặt<input type="file" accept="application/json,.json" onChange={importSettings} className="hidden" /></label><Link to="/admin/costing" className={btn2}>Sao lưu toàn bộ dữ liệu →</Link></div>
             {dataMsg && <p className="text-sm text-accent">{dataMsg}</p>}

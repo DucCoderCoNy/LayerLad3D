@@ -5,6 +5,7 @@ import { uid, useStore } from '../../lib/store.js'
 import { uploadImage } from '../../lib/upload.js'
 import { slugify } from '../../lib/seo.js'
 import ProductImport, { HEADERS } from './ProductImport.jsx'
+import { logMoves, prodMove } from '../../lib/warehouse.js'
 import { downloadCSV } from '../../lib/export.js'
 import { DataTable, Field, Modal, Thumb, btn, btn2, inp, td } from '../../components/ui.jsx'
 
@@ -37,7 +38,11 @@ export default function AdminProducts() {
     let slug = base, n = 2
     while (products.some((x) => x.id !== edit.id && x.slug === slug)) slug = `${base}-${n++}`   // slug không trùng
     const p = { ...edit, slug, price: +edit.price, stock: +edit.stock, grams: +edit.grams || 0, images: imgs, image: imgs[0] || '' }
-    setProducts((c) => (p.id ? c.map((x) => (x.id === p.id ? p : x)) : [{ ...p, id: uid('sp') }, ...c])); setEdit(null)
+    const old = p.id && products.find((x) => x.id === p.id)
+    if (old && old.stock !== p.stock) logMoves([prodMove(p, p.stock - old.stock, 'Điều chỉnh', p.stock, { note: 'Sửa tồn kho trong trang Sản phẩm' })])
+    const nid = uid('sp')
+    if (!p.id && p.stock > 0) logMoves([prodMove({ ...p, id: nid }, p.stock, 'Nhập kho', p.stock, { note: 'Tồn kho khi tạo sản phẩm' })])
+    setProducts((c) => (p.id ? c.map((x) => (x.id === p.id ? p : x)) : [{ ...p, id: nid }, ...c])); setEdit(null)
   }
   const del = (p) => confirm(`Xóa "${p.name}"?`) && setProducts((c) => c.filter((x) => x.id !== p.id))
   const filtered = products.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()))
